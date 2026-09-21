@@ -34,7 +34,15 @@ const ProductoSchema = new Schema(
       },
       costo: {
         type: Number,
-        default: 0
+        default: 0,
+        validate: {
+          validator: function (v) {
+            // Solo exigimos un costo mayor a 0 cuando el envío es de tipo fijo
+            if (this.envio?.tipo === 'fijo') return v > 0;
+            return true; // gratis y a_consultar ignoran el costo
+          },
+          message: 'Si el envío es fijo, el costo debe ser mayor a 0'
+        }
       }
     },
     dimensions: {
