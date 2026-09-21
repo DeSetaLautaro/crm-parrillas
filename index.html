@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM Omnicanal WhatsApp</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .archivos-switch {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .archivos-switch-btn {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .archivos-switch-btn.activo {
+      background: #e5e7eb;
+      color: #111827;
+      border-color: #9ca3af;
+    }
+    .archivos-panel.hidden {
+      display: none;
+    }
+    #notas-panel textarea {
+      width: 100%;
+      margin-bottom: 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px;
+      font-size: 12px;
+      resize: vertical;
+    }
+    #notas-panel .lista-notas {
+      margin-top: 8px;
+    }
+    .nota-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f3f4f6;
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+    .nota-item-texto {
+      flex: 1;
+      margin-right: 6px;
+    }
+    .nota-remove-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #ef4444;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .whatsapp-selector {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .whatsapp-selector label {
+      white-space: nowrap;
+    }
+    .whatsapp-selector select {
+      flex: 1;
+      min-width: 0;
+      padding: 3px 5px;
+      font-size: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Slim Sidebar -->
+    <nav id="slim-sidebar">
+      <button id="btn-mobile-menu" title="Menú">⋯</button>
+      <div class="sidebar-buttons">
+        <button id="btn-inbox" class="sidebar-btn activo" title="Bandeja"><span>💬</span></button>
+        <button id="btn-config" class="sidebar-btn" title="Configuración"><span>⚙️</span></button>
+        <button id="btn-perfil" class="sidebar-btn" title="Perfil"><span>👤</span></button>
+        <button id="btn-pagos" class="sidebar-btn" title="Pagos a Meta"><span>💰</span></button>
+        <button id="btn-difusion" class="sidebar-btn" title="Difusiones"><span>📣</span></button>
+        <button id="btn-logout" class="sidebar-btn" title="Cerrar sesión"><span>⏻</span></button>
+      </div>
+    </nav>
+
+    <!-- Área de trabajo -->
+    <div id="workspace">
+      <div id="inbox-view" class="view"></div>
+      <div id="config-view" class="view hidden"></div>
+      <div id="perfil-view" class="view hidden"></div>
+      <div id="pagos-view" class="view hidden"></div>
+      <div id="difusion-view" class="view hidden"></div>
+    </div>
+  </div>
+
+  <!-- Modal de Login -->
+  <div id="modal-login" class="modal-login hidden">
+    <div class="modal-login-card">
+      <h2>Bienvenido 👋</h2>
+      <p class="modal-login-subtitle">Ingresá tu teléfono y PIN para acceder al CRM</p>
+      <input type="tel" id="input-telefono" placeholder="Ej: 541161234567" autocomplete="tel" />
+      <input type="password" id="input-pin" placeholder="• • • •" maxlength="6" autocomplete="off" />
+      <p id="login-error" class="login-error hidden"></p>
+      <button id="btn-ingresar" type="button">Ingresar</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="panel.js" defer></script>
+</body>
+</html>
