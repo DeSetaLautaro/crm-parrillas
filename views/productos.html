@@ -1,0 +1,194 @@
+<style>
+  #productos-view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 40px;
+    background: #F9FAFB;
+    overflow-y: auto;
+  }
+
+  #productos-view h2 {
+    font-size: 1.5rem;
+    color: #1F2937;
+    margin-bottom: 0;
+  }
+
+  .productos-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .productos-dimensiones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .productos-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .producto-card {
+    background: #FFFFFF;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .producto-foto {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    background: #F3F4F6;
+    display: block;
+  }
+
+  .producto-foto-vacia {
+    width: 100%;
+    height: 160px;
+    background: #F3F4F6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #9CA3AF;
+  }
+
+  .producto-card-body {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .producto-nombre {
+    font-weight: 600;
+    color: #1F2937;
+    font-size: 1rem;
+  }
+
+  .producto-precio {
+    font-weight: 700;
+    color: #2563EB;
+  }
+
+  .producto-extra {
+    font-size: 0.8rem;
+    color: #6B7280;
+  }
+
+  .producto-acciones {
+    display: flex;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid #F1F5F9;
+  }
+
+  .producto-acciones button {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #D1D5DB;
+    background: #FFFFFF;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .producto-acciones .producto-eliminar {
+    color: #DC2626;
+    border-color: #FECACA;
+  }
+
+  .productos-vacio {
+    color: #9CA3AF;
+    font-size: 0.9rem;
+    padding: 20px 0;
+  }
+</style>
+
+<h2>Mis parrillas</h2>
+
+<div class="config-card">
+  <h3 id="producto-form-titulo">Nueva parrilla</h3>
+  <input type="hidden" id="producto-id" value="">
+
+  <div class="config-panel">
+    <div class="productos-form-grid">
+      <div class="difusion-field-group">
+        <label class="difusion-label" for="producto-nombre">Nombre</label>
+        <input type="text" id="producto-nombre" class="difusion-input" placeholder="Ej: Parrilla Fogonero 60cm">
+      </div>
+      <div class="difusion-field-group">
+        <label class="difusion-label" for="producto-precio">Precio</label>
+        <input type="number" id="producto-precio" class="difusion-input" min="0" step="0.01" placeholder="0">
+      </div>
+      <div class="difusion-field-group">
+        <label class="difusion-label" for="producto-foto">Foto (URL o ruta)</label>
+        <input type="text" id="producto-foto" class="difusion-input" placeholder="/uploads/... o https://...">
+      </div>
+      <div class="difusion-field-group">
+        <label class="difusion-label" for="producto-extras">Extras (separados por coma)</label>
+        <input type="text" id="producto-extras" class="difusion-input" placeholder="Incluye palita, Mesita lateral">
+      </div>
+    </div>
+
+    <div class="difusion-field-group">
+      <label class="difusion-label">Envío</label>
+      <div class="difusion-radio-group">
+        <label class="difusion-radio">
+          <input type="radio" name="producto-envio" value="gratis"> Gratis
+        </label>
+        <label class="difusion-radio">
+          <input type="radio" name="producto-envio" value="a_consultar" checked> A consultar
+        </label>
+        <label class="difusion-radio">
+          <input type="radio" name="producto-envio" value="fijo"> Precio fijo
+        </label>
+      </div>
+      <div id="producto-envio-costo-wrapper" style="display:none; margin-top:8px;">
+        <label class="difusion-label" for="producto-envio-costo">Costo de envío</label>
+        <input type="number" id="producto-envio-costo" class="difusion-input" min="0" step="0.01" placeholder="0">
+      </div>
+    </div>
+
+    <div class="difusion-field-group">
+      <label class="difusion-label">Medidas (en cm)</label>
+      <div class="productos-dimensiones">
+        <input type="number" id="producto-width" class="difusion-input" placeholder="Ancho total">
+        <input type="number" id="producto-depth" class="difusion-input" placeholder="Profundidad total">
+        <input type="number" id="producto-height" class="difusion-input" placeholder="Alto total">
+        <input type="number" id="producto-diametro" class="difusion-input" placeholder="Diámetro">
+        <input type="number" id="producto-emparrillado-width" class="difusion-input" placeholder="Emparrillado ancho">
+        <input type="number" id="producto-emparrillado-depth" class="difusion-input" placeholder="Emparrillado prof.">
+      </div>
+    </div>
+
+    <div class="difusion-field-group">
+      <label class="difusion-label" for="producto-display">Texto de medidas (lo que ve el cliente)</label>
+      <input type="text" id="producto-display" class="difusion-input" placeholder="Ej: 60 x 40 x 90 cm">
+    </div>
+
+    <span id="producto-error" class="difusion-error" style="display:none;"></span>
+
+    <div style="display:flex; gap:10px;">
+      <button type="button" id="btn-guardar-producto" class="btn-guardar-config">Guardar parrilla</button>
+      <button type="button" id="btn-cancelar-producto" class="btn-guardar-config" style="background:#E5E7EB; color:#374151; display:none;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div>
+  <h3 style="font-size:1rem; font-weight:600; color:#374151; margin-bottom:12px;">Parrillas cargadas</h3>
+  <div id="productos-lista" class="productos-lista"></div>
+</div>

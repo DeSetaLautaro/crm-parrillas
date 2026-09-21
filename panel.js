@@ -123,6 +123,7 @@ let cargandoMensajes = false;
 let ventanaAbiertaGlobal = true;
 let PLANTILLAS_META = [];
 let modalPlantillaAbierto = false;
+let PRODUCTOS = [];
 let EMPRESAS_INFO = [];
 let AGENTES_GLOBAL = [];
 let agenteEditandoId = null;
@@ -975,7 +976,7 @@ function renderTodo() {
 // ===== Alternancia de vistas (Sidebar) =====
 function ajustarVisibilidadSegunRol() {
   const esAgente = usuarioActual && usuarioActual.rol === 'agente';
-  const ids = ['btn-config', 'btn-pagos', 'btn-difusion', 'admin-agentes-wrapper'];
+  const ids = ['btn-config', 'btn-pagos', 'btn-difusion', 'btn-productos', 'admin-agentes-wrapper'];
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = esAgente ? 'none' : '';
@@ -1017,7 +1018,8 @@ function actualizarTituloSidebar(vista) {
     config: 'Configuración',
     perfil: 'Perfil',
     pagos: 'Pagos',
-    difusion: 'Difusión'
+    difusion: 'Difusión',
+    productos: 'Mis parrillas'
   };
   spanTitulo.textContent = titulos[vista] || '';
 }
@@ -1029,22 +1031,26 @@ function showView(vista) {
   const perfilView = document.getElementById('perfil-view');
   const pagosView = document.getElementById('pagos-view');
   const difusionView = document.getElementById('difusion-view');
+  const productosView = document.getElementById('productos-view');
   const btnInbox = document.getElementById('btn-inbox');
   const btnConfig = document.getElementById('btn-config');
   const btnPerfil = document.getElementById('btn-perfil');
   const btnPagos = document.getElementById('btn-pagos');
   const btnDifusion = document.getElementById('btn-difusion');
+  const btnProductos = document.getElementById('btn-productos');
 
   if (inboxView) inboxView.classList.add('hidden');
   if (configView) configView.classList.add('hidden');
   if (perfilView) perfilView.classList.add('hidden');
   if (pagosView) pagosView.classList.add('hidden');
   if (difusionView) difusionView.classList.add('hidden');
+  if (productosView) productosView.classList.add('hidden');
   if (btnInbox) btnInbox.classList.remove('activo');
   if (btnConfig) btnConfig.classList.remove('activo');
   if (btnPerfil) btnPerfil.classList.remove('activo');
   if (btnPagos) btnPagos.classList.remove('activo');
   if (btnDifusion) btnDifusion.classList.remove('activo');
+  if (btnProductos) btnProductos.classList.remove('activo');
 
   if (vista === 'inbox') {
     inboxView?.classList.remove('hidden');
@@ -1065,6 +1071,10 @@ function showView(vista) {
     difusionView?.classList.remove('hidden');
     btnDifusion?.classList.add('activo');
     cargarDifusiones();
+  } else if (vista === 'productos') {
+    productosView?.classList.remove('hidden');
+    btnProductos?.classList.add('activo');
+    cargarProductos();
   }
 }
 
@@ -4151,7 +4161,7 @@ async function manejarLogin() {
 
 // ===== Eventos =====
 function precargarVistas() {
-  const archivos = ['chats', 'config', 'perfil', 'pagos', 'difusion'];
+  const archivos = ['chats', 'config', 'perfil', 'pagos', 'difusion', 'productos'];
   return Promise.all(archivos.map(async (nombre) => {
     if (vistasCache[nombre]) return;
     try {
@@ -4173,6 +4183,8 @@ function precargarVistas() {
     if (pagosView && vistasCache['pagos']) pagosView.innerHTML = vistasCache['pagos'];
     const difusionView = document.getElementById('difusion-view');
     if (difusionView && vistasCache['difusion']) difusionView.innerHTML = vistasCache['difusion'];
+    const productosView = document.getElementById('productos-view');
+    if (productosView && vistasCache['productos']) productosView.innerHTML = vistasCache['productos'];
   });
 }
 
@@ -4263,6 +4275,11 @@ async function init() {
   const btnDifusion = document.getElementById('btn-difusion');
   if (btnDifusion) {
     btnDifusion.addEventListener('click', () => showView('difusion'));
+  }
+
+  const btnProductos = document.getElementById('btn-productos');
+  if (btnProductos) {
+    btnProductos.addEventListener('click', () => showView('productos'));
   }
 
   const btnCrearDifusion = document.getElementById('btn-crear-difusion');
@@ -4398,6 +4415,9 @@ async function init() {
   if (btnGuardarHorarios) btnGuardarHorarios.addEventListener('click', guardarHorariosDesdePanel);
   const inputFoto = document.getElementById('config-foto');
   if (inputFoto) inputFoto.addEventListener('change', previewFoto);
+
+  // Sección "Mis parrillas"
+  initProductos();
 
   // Selector de cuenta WhatsApp
   const selectWhatsapp = document.getElementById('select-whatsapp');
@@ -5011,6 +5031,275 @@ async function toggleAgenteDesdeUI(id, activoActual) {
     console.error('Error al cambiar estado del agente:', error);
     mostrarToast('Error al cambiar estado del agente', 'error');
   }
+}
+
+// ===== Mis parrillas (productos) =====
+function obtenerValorProducto(idCampo) {
+  const el = document.getElementById(idCampo);
+  return el ? el.value : '';
+}
+
+function mostrarErrorProducto(mensaje) {
+  const el = document.getElementById('producto-error');
+  if (!el) return;
+  if (mensaje) {
+    el.textContent = mensaje;
+    el.style.display = 'block';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
+function actualizarEnvioCostoProducto() {
+  const tipo = document.querySelector('input[name="producto-envio"]:checked')?.value || 'a_consultar';
+  const wrapper = document.getElementById('producto-envio-costo-wrapper');
+  if (wrapper) wrapper.style.display = tipo === 'fijo' ? 'block' : 'none';
+}
+
+function limpiarFormularioProducto() {
+  const campos = [
+    'producto-id', 'producto-nombre', 'producto-precio', 'producto-foto', 'producto-extras',
+    'producto-envio-costo', 'producto-width', 'producto-depth', 'producto-height',
+    'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth',
+    'producto-display'
+  ];
+  campos.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  const radioConsulta = document.querySelector('input[name="producto-envio"][value="a_consultar"]');
+  if (radioConsulta) radioConsulta.checked = true;
+  actualizarEnvioCostoProducto();
+
+  const titulo = document.getElementById('producto-form-titulo');
+  if (titulo) titulo.textContent = 'Nueva parrilla';
+
+  const btnCancelar = document.getElementById('btn-cancelar-producto');
+  if (btnCancelar) btnCancelar.style.display = 'none';
+
+  mostrarErrorProducto('');
+}
+
+function etiquetaEnvioProducto(envio) {
+  const tipo = envio?.tipo || 'a_consultar';
+  if (tipo === 'gratis') return 'Envío gratis';
+  if (tipo === 'fijo') return `Envío $${Number(envio.costo || 0).toFixed(2)}`;
+  return 'Envío a consultar';
+}
+
+function renderProductos(productos) {
+  const cont = document.getElementById('productos-lista');
+  if (!cont) return;
+
+  if (!productos || productos.length === 0) {
+    cont.innerHTML = '<div class="productos-vacio">Todavía no cargaste parrillas</div>';
+    return;
+  }
+
+  cont.innerHTML = productos.map(p => {
+    const nombre = escaparHTML(p.nombre || '');
+    const precio = Number(p.precio || 0).toFixed(2);
+    const foto = p.fotoUrl
+      ? `<img class="producto-foto" src="${urlFotoConToken(p.fotoUrl)}" alt="${nombre}">`
+      : '<div class="producto-foto-vacia">🍖</div>';
+    const medidas = p.dimensions?.displayString
+      ? `<span class="producto-extra">${escaparHTML(p.dimensions.displayString)}</span>`
+      : '';
+    const extras = (p.extras || []).length
+      ? `<span class="producto-extra">${escaparHTML((p.extras || []).join(' · '))}</span>`
+      : '';
+    return `
+      <div class="producto-card" data-producto-id="${p._id}">
+        ${foto}
+        <div class="producto-card-body">
+          <span class="producto-nombre">${nombre}</span>
+          <span class="producto-precio">$${precio}</span>
+          ${medidas}
+          ${extras}
+          <span class="producto-extra">${etiquetaEnvioProducto(p.envio)}</span>
+        </div>
+        <div class="producto-acciones">
+          <button type="button" class="producto-editar" data-id="${p._id}">Editar</button>
+          <button type="button" class="producto-eliminar" data-id="${p._id}">Eliminar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function cargarProductos() {
+  const token = localStorage.getItem('token') || '';
+  const cont = document.getElementById('productos-lista');
+  if (cont) cont.innerHTML = '<div class="productos-vacio">Cargando...</div>';
+
+  try {
+    const res = await fetch('/api/productos', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+    const data = await res.json();
+    PRODUCTOS = data.productos || [];
+    renderProductos(PRODUCTOS);
+  } catch (error) {
+    console.error('Error al cargar productos:', error);
+    if (cont) cont.innerHTML = '<div class="productos-vacio">No se pudieron cargar las parrillas</div>';
+  }
+}
+
+function editarProducto(id) {
+  const p = PRODUCTOS.find(x => String(x._id) === String(id));
+  if (!p) return;
+
+  const set = (idCampo, valor) => {
+    const el = document.getElementById(idCampo);
+    if (el) el.value = valor ?? '';
+  };
+
+  set('producto-id', p._id);
+  set('producto-nombre', p.nombre || '');
+  set('producto-precio', p.precio ?? '');
+  set('producto-foto', p.fotoUrl || '');
+  set('producto-extras', (p.extras || []).join(', '));
+
+  const tipo = p.envio?.tipo || 'a_consultar';
+  const radio = document.querySelector(`input[name="producto-envio"][value="${tipo}"]`);
+  if (radio) radio.checked = true;
+  set('producto-envio-costo', p.envio?.costo ?? '');
+  actualizarEnvioCostoProducto();
+
+  const d = p.dimensions || {};
+  set('producto-width', d.widthCm ?? '');
+  set('producto-depth', d.depthCm ?? '');
+  set('producto-height', d.heightCm ?? '');
+  set('producto-diametro', d.diametroCm ?? '');
+  set('producto-emparrillado-width', d.emparrilladoWidthCm ?? '');
+  set('producto-emparrillado-depth', d.emparrilladoDepthCm ?? '');
+  set('producto-display', d.displayString || '');
+
+  const titulo = document.getElementById('producto-form-titulo');
+  if (titulo) titulo.textContent = 'Editar parrilla';
+
+  const btnCancelar = document.getElementById('btn-cancelar-producto');
+  if (btnCancelar) btnCancelar.style.display = 'inline-block';
+
+  mostrarErrorProducto('');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function guardarProducto() {
+  const id = obtenerValorProducto('producto-id').trim();
+  const nombre = obtenerValorProducto('producto-nombre').trim();
+  const precio = parseFloat(obtenerValorProducto('producto-precio'));
+  const fotoUrl = obtenerValorProducto('producto-foto').trim();
+  const displayString = obtenerValorProducto('producto-display').trim();
+  const tipoEnvio = document.querySelector('input[name="producto-envio"]:checked')?.value || 'a_consultar';
+  const costoEnvio = parseFloat(obtenerValorProducto('producto-envio-costo')) || 0;
+  const extras = obtenerValorProducto('producto-extras')
+    .split(',')
+    .map(e => e.trim())
+    .filter(Boolean);
+
+  if (!nombre) return mostrarErrorProducto('Poné un nombre para la parrilla');
+  if (isNaN(precio) || precio < 0) return mostrarErrorProducto('El precio no es válido');
+  if (tipoEnvio === 'fijo' && costoEnvio <= 0) {
+    return mostrarErrorProducto('Si el envío es fijo, poné un costo mayor a 0');
+  }
+  if (!displayString) return mostrarErrorProducto('Completá el texto de medidas');
+
+  const numeroOpcional = (idCampo) => {
+    const v = obtenerValorProducto(idCampo);
+    if (v === '' || isNaN(Number(v))) return undefined;
+    return Number(v);
+  };
+
+  const payload = {
+    nombre,
+    precio,
+    fotoUrl,
+    extras,
+    envio: { tipo: tipoEnvio, costo: tipoEnvio === 'fijo' ? costoEnvio : 0 },
+    dimensions: {
+      widthCm: numeroOpcional('producto-width'),
+      depthCm: numeroOpcional('producto-depth'),
+      heightCm: numeroOpcional('producto-height'),
+      diametroCm: numeroOpcional('producto-diametro'),
+      emparrilladoWidthCm: numeroOpcional('producto-emparrillado-width'),
+      emparrilladoDepthCm: numeroOpcional('producto-emparrillado-depth'),
+      displayString
+    }
+  };
+
+  const token = localStorage.getItem('token') || '';
+  try {
+    const res = await fetch(id ? `/api/productos/${id}` : '/api/productos', {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      mostrarErrorProducto(data.error || 'No se pudo guardar la parrilla');
+      return;
+    }
+    mostrarToast(id ? 'Parrilla actualizada' : 'Parrilla creada', 'info');
+    limpiarFormularioProducto();
+    await cargarProductos();
+  } catch (error) {
+    console.error('Error al guardar producto:', error);
+    mostrarErrorProducto('Error de red al guardar la parrilla');
+  }
+}
+
+async function eliminarProducto(id) {
+  if (!confirm('¿Eliminar esta parrilla?')) return;
+  const token = localStorage.getItem('token') || '';
+  try {
+    const res = await fetch(`/api/productos/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      mostrarToast(data.error || 'No se pudo eliminar la parrilla', 'error');
+      return;
+    }
+    mostrarToast('Parrilla eliminada', 'info');
+    await cargarProductos();
+  } catch (error) {
+    console.error('Error al eliminar producto:', error);
+    mostrarToast('Error de red al eliminar la parrilla', 'error');
+  }
+}
+
+function initProductos() {
+  const btnGuardar = document.getElementById('btn-guardar-producto');
+  if (btnGuardar) btnGuardar.addEventListener('click', guardarProducto);
+
+  const btnCancelar = document.getElementById('btn-cancelar-producto');
+  if (btnCancelar) btnCancelar.addEventListener('click', limpiarFormularioProducto);
+
+  document.querySelectorAll('input[name="producto-envio"]').forEach(radio => {
+    radio.addEventListener('change', actualizarEnvioCostoProducto);
+  });
+
+  const lista = document.getElementById('productos-lista');
+  if (lista) {
+    lista.addEventListener('click', (e) => {
+      const btnEditar = e.target.closest('.producto-editar');
+      if (btnEditar) {
+        editarProducto(btnEditar.dataset.id);
+        return;
+      }
+      const btnEliminar = e.target.closest('.producto-eliminar');
+      if (btnEliminar) {
+        eliminarProducto(btnEliminar.dataset.id);
+      }
+    });
+  }
+
+  actualizarEnvioCostoProducto();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
