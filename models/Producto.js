@@ -7,7 +7,8 @@ const ProductoSchema = new Schema(
     empresaId: {
       type: Types.ObjectId,
       ref: 'Empresa',
-      required: true
+      required: true,
+      index: true
     },
     nombre: {
       type: String,
@@ -17,17 +18,36 @@ const ProductoSchema = new Schema(
       type: Number,
       required: true
     },
-    categoria: {
+    fotoUrl: {
       type: String,
       default: ''
     },
-    descripcion: {
-      type: String,
-      default: ''
-    },
-    toppings: {
+    extras: {
       type: [String],
       default: []
+    },
+    envio: {
+      tipo: {
+        type: String,
+        enum: ['gratis', 'a_consultar', 'fijo'],
+        default: 'a_consultar'
+      },
+      costo: {
+        type: Number,
+        default: 0
+      }
+    },
+    dimensions: {
+      widthCm: Number,
+      depthCm: Number,
+      heightCm: Number,
+      diametroCm: Number,
+      emparrilladoWidthCm: Number,
+      emparrilladoDepthCm: Number,
+      displayString: {
+        type: String,
+        required: true
+      }
     }
   },
   { timestamps: true }
