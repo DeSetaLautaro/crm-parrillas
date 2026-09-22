@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 function crearLimiterUsuario(windowMs, max) {
   return rateLimit({
@@ -6,7 +6,9 @@ function crearLimiterUsuario(windowMs, max) {
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.usuario?.id || req.ip
+    // Para usuarios autenticados usamos su id; para el resto, el helper
+    // ipKeyGenerator agrupa las IPv6 por subred y evita el bypass por rotación.
+    keyGenerator: (req) => req.usuario?.id || ipKeyGenerator(req.ip)
   });
 }
 
