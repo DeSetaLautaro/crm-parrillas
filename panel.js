@@ -5080,6 +5080,7 @@ function limpiarFormularioProducto() {
   if (btnCancelar) btnCancelar.style.display = 'none';
 
   mostrarErrorProducto('');
+  actualizarPreviewFotoProducto();
 }
 
 function etiquetaEnvioProducto(envio) {
@@ -5185,6 +5186,7 @@ function editarProducto(id) {
   if (btnCancelar) btnCancelar.style.display = 'inline-block';
 
   mostrarErrorProducto('');
+  actualizarPreviewFotoProducto();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -5299,7 +5301,74 @@ function initProductos() {
     });
   }
 
+  // Subida de foto del producto
+  const btnSubirFoto = document.getElementById('btn-subir-foto-producto');
+  const inputFotoArchivo = document.getElementById('producto-foto-archivo');
+  if (btnSubirFoto && inputFotoArchivo) {
+    btnSubirFoto.addEventListener('click', () => inputFotoArchivo.click());
+    inputFotoArchivo.addEventListener('change', subirFotoProducto);
+  }
+
+  // Refrescar la preview si el usuario tipea/pega una URL manualmente
+  const inputFotoTexto = document.getElementById('producto-foto');
+  if (inputFotoTexto) {
+    inputFotoTexto.addEventListener('input', actualizarPreviewFotoProducto);
+  }
+
   actualizarEnvioCostoProducto();
+  actualizarPreviewFotoProducto();
+}
+
+function actualizarPreviewFotoProducto() {
+  const preview = document.getElementById('producto-foto-preview');
+  if (!preview) return;
+  const valor = obtenerValorProducto('producto-foto').trim();
+  if (!valor) {
+    preview.style.display = 'none';
+    preview.removeAttribute('src');
+    return;
+  }
+  preview.onerror = () => { preview.style.display = 'none'; };
+  preview.src = urlFotoConToken(valor);
+  preview.style.display = 'block';
+}
+
+async function subirFotoProducto(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const estado = document.getElementById('producto-foto-estado');
+  if (estado) estado.textContent = 'Subiendo...';
+  mostrarErrorProducto('');
+
+  const formData = new FormData();
+  formData.append('foto', file);
+
+  const token = localStorage.getItem('token') || '';
+  try {
+    const res = await fetch('/api/productos/subir-foto', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      mostrarErrorProducto(data.error || 'No se pudo subir la imagen');
+      if (estado) estado.textContent = '';
+      return;
+    }
+    const inputFoto = document.getElementById('producto-foto');
+    if (inputFoto) inputFoto.value = data.fotoUrl || '';
+    actualizarPreviewFotoProducto();
+    if (estado) estado.textContent = 'Imagen subida ✓';
+    setTimeout(() => { if (estado) estado.textContent = ''; }, 2000);
+  } catch (error) {
+    console.error('Error al subir foto del producto:', error);
+    mostrarErrorProducto('Error de red al subir la imagen');
+    if (estado) estado.textContent = '';
+  } finally {
+    e.target.value = '';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

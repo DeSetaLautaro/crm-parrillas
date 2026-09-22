@@ -134,8 +134,14 @@
         <input type="number" id="producto-precio" class="difusion-input" min="0" step="0.01" placeholder="0">
       </div>
       <div class="difusion-field-group">
-        <label class="difusion-label" for="producto-foto">Foto (URL o ruta)</label>
+        <label class="difusion-label" for="producto-foto">Foto</label>
         <input type="text" id="producto-foto" class="difusion-input" placeholder="/uploads/... o https://...">
+        <div style="margin-top:8px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <input type="file" id="producto-foto-archivo" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+          <button type="button" id="btn-subir-foto-producto" style="padding:8px 14px; border-radius:8px; border:1px solid #D1D5DB; background:#FFFFFF; font-size:0.85rem; font-weight:600; cursor:pointer;">📷 Subir imagen</button>
+          <img id="producto-foto-preview" alt="" style="width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid #E5E7EB; display:none;">
+          <span id="producto-foto-estado" style="font-size:12px; color:#6B7280;"></span>
+        </div>
       </div>
       <div class="difusion-field-group">
         <label class="difusion-label" for="producto-extras">Extras (separados por coma)</label>

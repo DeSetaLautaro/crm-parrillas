@@ -179,10 +179,29 @@ async function eliminarProducto(req, res) {
   }
 }
 
+// Sube una foto de producto y devuelve la ruta relativa para guardar en fotoUrl.
+async function subirFotoProducto(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió archivo' });
+    }
+    const empresaId = req.empresaId;
+    if (!empresaId) {
+      return res.status(403).json({ error: 'No se pudo identificar la empresa' });
+    }
+    const fotoUrl = `/uploads/${empresaId}/${req.file.filename}`;
+    return res.status(201).json({ ok: true, fotoUrl });
+  } catch (error) {
+    console.error('Error al subir foto de producto:', error);
+    return res.status(500).json({ error: 'Error interno al subir la foto' });
+  }
+}
+
 module.exports = {
   listarProductos,
   obtenerProducto,
   crearProducto,
   actualizarProducto,
-  eliminarProducto
+  eliminarProducto,
+  subirFotoProducto
 };
