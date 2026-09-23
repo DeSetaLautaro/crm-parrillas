@@ -1,0 +1,235 @@
+<style>
+  .pestana-contador {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #e5e7eb;
+    color: #374151;
+  }
+</style>
+  <!-- Columna Izquierda -->
+  <aside id="col-izquierda" class="col">
+    <!-- Modal para crear contacto -->
+    <div id="modal-nuevo-contacto" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header-flex">
+          <h3>Nuevo contacto</h3>
+          <button id="btn-cerrar-nuevo-contacto" class="modal-close-btn" aria-label="Cerrar">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-contacto-form">
+          <label for="nuevo-contacto-nombre" class="form-label">Nombre</label>
+          <input type="text" id="nuevo-contacto-nombre" placeholder="Nombre del cliente" class="form-input">
+          <label for="nuevo-contacto-telefono" class="form-label">Teléfono</label>
+          <input type="tel" id="nuevo-contacto-telefono" placeholder="Ej: 5491122334455" class="form-input">
+          <label for="nuevo-contacto-direccion" class="form-label">Dirección (opcional)</label>
+          <input type="text" id="nuevo-contacto-direccion" placeholder="Calle y número" class="form-input">
+          <label for="nuevo-contacto-etiquetas" class="form-label">Etiquetas (separadas por coma, opcional)</label>
+          <input type="text" id="nuevo-contacto-etiquetas" placeholder="VIP, interesado, no compró" class="form-input">
+          <button id="btn-guardar-nuevo-contacto" class="btn-guardar-config btn-nuevo-contacto-guardar">Guardar</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-header">
+      <div class="panel-header-titulo">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h2>Bandeja de entrada</h2>
+          <button id="btn-nuevo-contacto" class="btn-nuevo-contacto" title="Agregar contacto">+</button>
+        </div>
+        <div class="mensajes-restantes" id="mensajes-restantes" title="Conversaciones iniciadas en las últimas 24 hs">
+          <strong id="uso-conversaciones-num">–</strong>
+          <span>/</span>
+          <strong id="uso-conversaciones-max">–</strong>
+        </div>
+      </div>
+      <div class="whatsapp-selector">
+        <label for="select-whatsapp">Línea:</label>
+        <select id="select-whatsapp"></select>
+      </div>
+      <div class="buscador">
+        <input type="search" id="buscador" placeholder="Buscar chats...">
+      </div>
+      <div class="pestanas">
+        <button class="pestana" data-pestana="todos">
+          Todos <span class="pestana-contador" data-contador="todos"></span>
+        </button>
+        <button class="pestana activa" data-pestana="pendientes">
+          Bot inactivo
+          <span class="pestana-contador" data-contador="pendientes"></span>
+        </button>
+        <button class="pestana" data-pestana="resueltos">
+          Atendidos <span class="pestana-contador" data-contador="resueltos"></span>
+        </button>
+      </div>
+    </div>
+    <div id="lista-chats" class="lista-chats">
+      <!-- Chats renderizados -->
+    </div>
+  </aside>
+
+  <!-- Vista Vacía -->
+  <div id="empty-state" class="empty-state">
+    <div class="empty-state-icon">💬</div>
+    <p>Aquí se mostrará el chat que selecciones</p>
+  </div>
+
+  <!-- Columna Central -->
+  <main id="col-central" class="col">
+    <div class="chat-header">
+      <div class="info-chat">
+        <strong id="chat-nombre"></strong>
+        <span id="chat-linea"></span>
+      </div>
+      <div class="toggle-wrapper">
+        <label class="toggle" for="toggle-bot">
+          <input type="checkbox" id="toggle-bot">
+          <span class="slider"></span>
+        </label>
+        <span id="estado-bot">Bot Activo</span>
+      </div>
+    </div>
+    <div id="aviso-ventana-cerrada" class="hidden" style="background:#fef3c7; border:1px solid #f59e0b; color:#92400e; padding:10px 14px; border-radius:8px; margin:8px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <strong>⚠️ Ventana de 24h cerrada</strong>
+        <br>
+        <span style="font-size:13px;">Para responder a este cliente necesitás usar una plantilla aprobada.</span>
+      </div>
+      <button id="btn-elegir-plantilla-ventana" style="background:#f59e0b; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">
+        Elegir plantilla
+      </button>
+    </div>
+    <div id="area-mensajes" class="area-mensajes">
+      <!-- Mensajes -->
+    </div>
+    <div id="archivo-pendiente-wrapper" style="display:none; padding:6px 12px; background:#f9fafb; border-top:1px solid #e5e7eb; font-size:13px; align-items:center; gap:8px;">
+      <span style="font-size:16px;">📎</span>
+      <div id="archivo-pendiente-lista" style="flex:1; display:flex; flex-direction:column; gap:2px; overflow:hidden;"></div>
+      <button id="archivo-pendiente-quitar" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:16px;">✕</button>
+    </div>
+    <div class="composer">
+      <div id="atajos-flotante" class="atajos-flotante"></div>
+      <button id="btn-adjuntar" title="Adjuntar archivo" style="background:transparent;border:none;cursor:pointer;font-size:20px;color:#9ca3af;padding:0 8px;">📎</button>
+      <input type="file" id="input-adjuntar" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple style="display:none;">
+      <textarea id="input-mensaje" rows="1" placeholder="Escribí un mensaje..." disabled autocomplete="off"></textarea>
+      <button id="btn-enviar" disabled>Enviar</button>
+    </div>
+  </main>
+
+  <!-- Columna Derecha -->
+  <aside id="col-derecha" class="col">
+    <div class="perfil-header">
+      <div class="perfil-avatar" id="perfil-avatar">M</div>
+      <div class="perfil-datos">
+        <span class="perfil-nombre" id="perfil-nombre-texto">Martina</span>
+        <span class="perfil-telefono" id="perfil-telefono-texto">5491100000001</span>
+      </div>
+      <div class="perfil-acciones">
+        <!--<button class="perfil-accion" title="Llamar">📞</button>-->
+        <button class="perfil-accion" id="btn-mas" title="Más">⋯</button>
+        <div id="perfil-menu" class="perfil-menu hidden">
+          <button id="btn-detalles-modal" class="perfil-menu-item">Detalles</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="perfil-etiquetas">
+      <div class="perfil-seccion-titulo">Etiquetas</div>
+      <div class="etiquetas-input-wrapp">
+        <input type="text" id="nueva-etiqueta-input" placeholder="Nueva etiqueta..." />
+        <button id="btn-agregar-etiqueta" type="button" class="etiqueta-btn-add">+</button>
+      </div>
+      <div id="lista-etiquetas" class="etiquetas-list">
+        <!-- Etiquetas -->
+      </div>
+    </div>
+
+    <div class="perfil-pedido">
+      <div class="perfil-seccion-titulo">📦 Pedido en Curso / Último Pedido</div>
+      <div id="pedido-info" class="pedido-info">
+        <span style="color:#9CA3AF;">Sin pedidos en curso</span>
+      </div>
+    </div>
+
+    <div class="perfil-archivos">
+      <div class="perfil-seccion-titulo">Compartidos</div>
+      <div class="archivos-switch">
+        <button class="archivos-switch-btn activo" data-pestana-archivo="notas" type="button">Notas</button>
+        <button class="archivos-switch-btn" data-pestana-archivo="archivos" type="button">Archivos</button>
+      </div>
+      <div id="notas-panel" class="archivos-panel">
+        <textarea id="nota-interna-textarea" rows="3" placeholder="Escribí una nota invisible para el cliente..."></textarea>
+        <button id="guardar-nota" type="button">Guardar Nota</button>
+        <div id="lista-notas" class="lista-notas"></div>
+      </div>
+      <div id="archivos-panel" class="archivos-panel hidden">
+        <div class="archivos-grid">
+          <div class="archivo-miniatura"></div>
+          <div class="archivo-miniatura"></div>
+          <div class="archivo-miniatura"></div>
+          <div class="archivo-miniatura"></div>
+          <div class="archivo-miniatura"></div>
+          <div class="archivo-miniatura"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de detalles (se abre desde el menú de tres puntos) -->
+    <div id="modal-detalles" class="modal-detalles hidden">
+      <div class="modal-header">
+        <button id="btn-cerrar-detalles" class="btn-cerrar" title="Volver al chat">←</button>
+        <span>Detalles del Contacto</span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-foto-contacto">
+          <img id="modal-contacto-foto" alt="Foto del contacto" />
+          <button id="btn-cambiar-foto-contacto" type="button">📷 Cambiar foto</button>
+          <input type="file" id="input-foto-contacto" accept="image/*" hidden>
+        </div>
+        <div class="detalle-item">
+          <span class="detalle-la">Nombre</span>
+          <input type="text" id="modal-nombre" class="detalle-input">
+        </div>
+        <div class="detalle-item">
+          <span class="detalle-la">Teléfono</span>
+          <input type="text" id="modal-telefono" class="detalle-input" disabled>
+        </div>
+        <div class="detalle-item">
+          <span class="detalle-la">Dirección</span>
+          <input type="text" id="modal-direccion" class="detalle-input">
+        </div>
+        <div class="detalle-item">
+          <span class="detalle-la">Piso / Depto</span>
+          <input type="text" id="modal-pisodpto" class="detalle-input">
+        </div>
+        <div class="detalle-item">
+          <span class="detalle-la">Código Postal / Localidad</span>
+          <input type="text" id="modal-codigopostal" class="detalle-input">
+        </div>
+        <button id="modal-guardar-detalles" class="btn-guardar-detalles">Guardar Cambios</button>
+      </div>
+    </div>
+
+    <!-- Campos ocultos para compatibilidad con panel.js -->
+    <input type="hidden" id="perfil-nombre" value="">
+    <input type="hidden" id="perfil-telefono" value="">
+  </aside>
+
+  <!-- Modal para elegir plantilla cuando la ventana está cerrada -->
+  <div id="modal-plantilla-ventana" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;">
+    <div style="background:#fff; padding:24px; border-radius:12px; max-width:500px; width:90%;">
+      <h3 style="margin-top:0;">Enviar plantilla</h3>
+      <label style="font-weight:bold; font-size:14px;">Plantilla aprobada</label>
+      <select id="plantilla-select-chat" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px; margin:6px 0 14px;"></select>
+      <div id="plantilla-variables-chat" style="margin-bottom:14px;"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button id="plantilla-cancelar-chat" style="padding:8px 16px; background:#e5e7eb; border:none; border-radius:6px; cursor:pointer;">Cancelar</button>
+        <button id="plantilla-enviar-chat" style="padding:8px 16px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">Enviar</button>
+      </div>
+    </div>
+  </div>

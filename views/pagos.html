@@ -1,0 +1,46 @@
+<h2>Pagos a Meta</h2>
+
+<div class="config-card">
+  <h3>💰 Estado de tu monedero</h3>
+  <div id="monedero-info" style="display:flex; flex-direction:column; gap:8px;">
+    <div><strong>Saldo disponible:</strong> $<span id="monedero-saldo">–</span> USD</div>
+    <div><strong>Costo del ciclo actual:</strong> $<span id="monedero-costo-ciclo">–</span> USD</div>
+    <div><strong>Deuda pendiente:</strong> $<span id="monedero-deuda">–</span> USD</div>
+    <div><strong>Límite de fiado (changüí):</strong> $<span id="monedero-tolerancia">–</span> USD</div>
+    <div id="monedero-bloqueado-msg" style="color:#ef4444; font-weight:bold; display:none;">
+      ⛔ No podés iniciar conversaciones nuevas. Cargá saldo para desbloquear.
+    </div>
+  </div>
+  <div id="monedero-aviso-banner" style="display:none; background:#fef3c7; border:1px solid #f59e0b; color:#92400e; padding:8px 12px; border-radius:6px; margin-bottom:8px; font-weight:bold;"></div>
+</div>
+
+<div class="config-card">
+  <h3>💳 Cargar saldo</h3>
+  <p style="color:#6B7280; font-size:0.85rem;">
+    Transferí al alias <strong>tu.alias</strong> y luego cargá el monto para acreditarlo.
+  </p>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input type="number" id="monedero-cargar-monto" placeholder="Monto en USD" min="1" step="0.01" style="flex:1; padding:8px; border:1px solid #d1d5db; border-radius:6px;" />
+    <button id="monedero-cargar-btn" type="button" class="btn-guardar-config">Cargar</button>
+  </div>
+  <p id="monedero-cargar-estado" style="color:#6B7280; font-size:0.85rem; margin-top:8px;"></p>
+</div>
+
+<div class="config-card">
+  <h3>💰 Costos de WhatsApp</h3>
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <div>
+      <strong>Costo total (últimos 30 días):</strong>
+      $<span id="meta-costo-total">–</span> USD
+    </div>
+    <div>
+      <strong>Última actualización:</strong>
+      <span id="meta-ultima-actualizacion">–</span>
+    </div>
+  </div>
+  <button id="btn-actualizar-costos" type="button" class="btn-guardar-config" style="margin-top:12px;">Actualizar ahora</button>
+  <p id="meta-actualizacion-estado" style="color:#6B7280; font-size:0.85rem; margin-top:8px;"></p>
+  <p style="color:#6B7280; font-size:0.85rem; margin-top:12px;">
+    Los datos se actualizan automáticamente cada 6 horas desde el panel de Meta.
+  </p>
+</div>

@@ -1,0 +1,88 @@
+<h2>Difusiones</h2>
+
+<div class="difusion-card">
+  <div class="difusion-field-group">
+    <label class="difusion-label">Tipo de mensaje</label>
+    <div class="difusion-radio-group">
+      <label class="difusion-radio">
+        <input type="radio" name="difusion-tipo-mensaje" value="libre" checked>
+        <span>Mensaje libre</span>
+      </label>
+      <label class="difusion-radio">
+        <input type="radio" name="difusion-tipo-mensaje" value="plantilla">
+        <span>Usar plantilla</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="difusion-field-group" id="difusion-mensaje-libre">
+    <label class="difusion-label" for="difusion-mensaje">Mensaje</label>
+    <textarea id="difusion-mensaje" rows="4" placeholder="Escribí el mensaje a difundir"></textarea>
+  </div>
+
+  <div class="difusion-field-group" id="difusion-plantilla-wrapper" style="display:none;">
+    <label class="difusion-label" for="difusion-plantilla-select">Seleccioná una plantilla</label>
+    <select id="difusion-plantilla-select" class="difusion-input"></select>
+  </div>
+
+  <div id="difusion-plantilla-preview" class="difusion-plantilla-preview" style="display:none;">
+    <span class="difusion-preview-label">Vista previa de la plantilla</span>
+    <div id="difusion-plantilla-preview-texto" class="difusion-preview-texto"></div>
+  </div>
+
+  <div class="difusion-field-group">
+    <label class="difusion-label">Destinatarios</label>
+    <label class="difusion-checkbox-linea"><input type="checkbox" id="difusion-dest-etiqueta" value="etiqueta"> Solo por etiqueta</label>
+    <label class="difusion-checkbox-linea"><input type="checkbox" id="difusion-dest-manual" value="manual"> Elegir manualmente</label>
+  </div>
+
+  <div id="difusion-etiqueta-wrapper" class="difusion-field-group" style="display:none;">
+    <label class="difusion-label" for="difusion-etiqueta">Etiqueta</label>
+    <select id="difusion-etiqueta">
+      <option value="">Seleccioná una etiqueta...</option>
+    </select>
+  </div>
+
+  <div id="difusion-manual-wrapper" class="difusion-field-group" style="display:none;">
+    <label class="difusion-label">Contactos (marcá los que quieras)</label>
+    <input type="search" id="difusion-buscador-contactos" placeholder="Buscar contacto..." class="difusion-input" />
+    <div id="difusion-contactos-lista" class="difusion-contactos-lista"></div>
+    <div class="difusion-contactos-acciones">
+      <button type="button" id="difusion-seleccionar-todos" class="difusion-btn-secundario">Seleccionar todos</button>
+      <button type="button" id="difusion-seleccionar-nada" class="difusion-btn-secundario">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="difusion-field-group">
+    <span class="difusion-radio-group">
+      <label class="difusion-radio">
+        <input type="radio" name="difusion-modenvio" value="ahora" checked>
+        <span>Enviar ahora</span>
+      </label>
+      <label class="difusion-radio">
+        <input type="radio" name="difusion-modenvio" value="programar">
+        <span>Programar envío</span>
+      </label>
+    </span>
+  </div>
+
+  <div id="difusion-programacion-wrapper" class="difusion-field-group" style="display:none;">
+    <label class="difusion-label" for="difusion-fecha-programacion">Programación</label>
+    <div class="difusion-datetime-wrapper">
+      <span class="difusion-datetime-icon">📅</span>
+      <input type="datetime-local" id="difusion-fecha-programacion" placeholder="Seleccioná fecha y hora" class="difusion-input" />
+    </div>
+    <span id="difusion-fecha-error" class="difusion-error" style="display:none;">La fecha debe ser a futuro</span>
+  </div>
+
+  <div class="difusion-counter">
+    <strong>Destinatarios:</strong> <span id="difusion-destinatarios-count">0</span>
+  </div>
+
+  <button id="btn-crear-difusion" type="button" class="difusion-btn-primario">📤 Crear difusión</button>
+</div>
+
+<div id="difusiones-historial-wrapper" style="margin-top:12px;">
+  <button type="button" id="btn-ver-historial" class="difusion-btn-secundario" style="display:none;">Ver historial de difusiones</button>
+  <div id="difusiones-lista" class="difusiones-lista"></div>
+</div>

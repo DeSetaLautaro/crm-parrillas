@@ -1,0 +1,82 @@
+<h2>Configuración del Bot</h2>
+
+<div class="config-card">
+  <h3>Instrucciones del bot (reglas)</h3>
+  <textarea id="prompt-ia" rows="8" placeholder="Escribí acá las reglas y órdenes para tu bot..."></textarea>
+  <p class="perfil-bienvenida-ayuda" style="margin-top:4px;">
+    Estas instrucciones se agregan automáticamente al contexto (catálogo, horarios, historial, carrito, etc.) que ya viene configurado en el sistema.
+  </p>
+  <div style="display:flex; align-items:center; gap:12px; justify-content:space-between;">
+    <label>
+      <input type="checkbox" id="aplicar-prompt-todas">
+      Aplicar a todas las líneas
+    </label>
+    <button type="button" id="btn-restaurar-prompt" class="btn-guardar-config" style="background:#6b7280;">Restaurar original</button>
+  </div>
+  <br><br>
+  <button class="btn-guardar-config" id="btn-guardar-prompt">Guardar Prompt</button>
+</div>
+
+<div class="config-card">
+  <h3>Atajos</h3>
+  <div class="atajo-form">
+    <div class="atajo-input-group">
+      <input type="text" id="atajo-comando-input" placeholder="Comando (ej: horarios)">
+    </div>
+    <div class="atajo-input-group">
+      <textarea id="atajo-respuesta-input" rows="2" placeholder="Respuesta (ej: Nuestro horario...)"></textarea>
+    </div>
+    <button id="atajo-agregar" type="button">+ Agregar</button>
+  </div>
+  <table class="atajos-tabla">
+    <thead>
+      <tr><th>Comando</th><th>Respuesta</th><th></th></tr>
+    </thead>
+    <tbody id="atajos-body"></tbody>
+  </table>
+  <br>
+  <label class="checkbox-linea">
+    <input type="checkbox" id="aplicar-atajos-todas">
+    Aplicar a todas las líneas
+  </label>
+  <br><br>
+</div>
+
+<div class="config-card">
+  <h3>Procesamiento de voz</h3>
+  <label class="checkbox-linea">
+    <input type="checkbox" id="procesar-audios">
+    Activar transcripción de audios con IA
+  </label>
+  <br><br>
+  <button class="btn-guardar-config" id="btn-guardar-audios">Guardar Audios</button>
+</div>
+
+<div class="config-card" id="admin-agentes-wrapper" style="display:none;">
+  <h3>Agentes del panel</h3>
+  <p>Creá usuarios con acceso limitado al panel. Cada agente ve solo las líneas que le asignes.</p>
+  <div class="atajo-form" style="flex-wrap:wrap; gap:8px;">
+    <div class="atajo-input-group">
+      <input type="text" id="agente-nombre" placeholder="Nombre del agente">
+    </div>
+    <div class="atajo-input-group">
+      <input type="text" id="agente-telefono" placeholder="Teléfono (solo números)">
+    </div>
+    <div class="atajo-input-group">
+      <input type="password" id="agente-pin" placeholder="PIN de acceso">
+    </div>
+    <div class="atajo-input-group" style="flex:1; min-width:200px;">
+      <select id="agente-empresas" multiple size="3" style="width:100%; padding:6px; border:1px solid #d1d5db; border-radius:6px;">
+        <!-- opciones llenadas dinámicamente -->
+      </select>
+      <span style="font-size:12px; color:#6b7280;">Mantené Ctrl/Cmd para elegir varias líneas.</span>
+    </div>
+    <button id="agente-guardar" type="button" style="padding:8px 16px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">Crear agente</button>
+  </div>
+  <table class="atajos-tabla" style="margin-top:12px;">
+    <thead>
+      <tr><th>Nombre</th><th>Teléfono</th><th>Líneas</th><th>Activo</th><th></th></tr>
+    </thead>
+    <tbody id="agentes-body"></tbody>
+  </table>
+</div>

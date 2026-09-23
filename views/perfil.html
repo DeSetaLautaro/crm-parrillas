@@ -1,0 +1,55 @@
+<div id="config-perfil" class="config-panel">
+  <!-- Perfil del Negocio -->
+  <div class="perfil-edicion">
+    <div class="perfil-foto-wrapper">
+      <div class="perfil-foto-redonda">
+        <img id="perfil-foto-grande" src="" class="perfil-foto-grande">
+      </div>
+      <label for="config-foto" class="perfil-foto-cambiar" title="Cambiar foto">📷</label>
+      <input type="file" id="config-foto" accept="image/*" style="display:none">
+    </div>
+    <div class="perfil-nombre-fila">
+      <div class="perfil-campo">
+        <label class="perfil-campo-label">Nombre</label>
+        <span class="perfil-campo-valor" id="perfil-nombre-display">Mi Local</span>
+      </div>
+      <button class="perfil-campo-editar" id="btn-editar-nombre" title="Editar nombre">✏️</button>
+    </div>
+    <div class="perfil-nombre-fila">
+      <div class="perfil-campo">
+        <label class="perfil-campo-label">Estado</label>
+        <span class="perfil-campo-valor" id="perfil-estado-display">Abierto hasta las 23hs</span>
+      </div>
+      <button class="perfil-campo-editar" id="btn-editar-estado" title="Editar estado">✏️</button>
+    </div>
+    <div class="perfil-nombre-fila">
+      <div class="perfil-campo">
+        <label class="perfil-campo-label">Mensaje de Bienvenida</label>
+        <span class="perfil-campo-valor" id="perfil-bienvenida-display" title="Si dejás este campo vacío, el bot responderá directamente sin mensaje de bienvenida previo."></span>
+      </div>
+      <button class="perfil-campo-editar" id="btn-editar-bienvenida" title="Editar bienvenida">✏️</button>
+    </div>
+    <div class="perfil-nombre-fila" style="flex-direction:column; align-items:stretch;">
+      <label class="perfil-campo-label">Horarios de atención</label>
+      <div id="horarios-container" style="margin-bottom:10px;"></div>
+      <button id="btn-guardar-horarios" type="button" style="align-self:flex-start; padding:8px 16px;">Guardar Horarios</button>
+    </div>
+  </div>
+
+  <!-- Modal para ajustar la foto de perfil -->
+  <div id="modal-foto-recortar" class="modal-crop hidden">
+    <div class="modal-crop-overlay"></div>
+    <div class="modal-crop-contenedor">
+      <h3>Ajustá tu foto</h3>
+      <div class="crop-area" id="crop-area">
+        <img id="crop-imagen" class="crop-imagen-movil" alt="Foto a ajustar" draggable="false">
+        <div id="crop-circulo" class="crop-circulo" tabindex="0" role="slider" aria-label="Área de recorte"></div>
+      </div>
+      <p class="crop-instrucciones">Arrastrá el círculo para elegir el encuadre.</p>
+      <div class="crop-botones">
+        <button id="crop-cancelar" type="button">Cancelar</button>
+        <button id="crop-aceptar" type="button">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
