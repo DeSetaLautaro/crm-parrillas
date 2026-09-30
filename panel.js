@@ -5060,6 +5060,7 @@ function actualizarEnvioCostoProducto() {
 function limpiarFormularioProducto() {
   const campos = [
     'producto-id', 'producto-nombre', 'producto-precio', 'producto-foto', 'producto-extras',
+    'producto-fbadid',
     'producto-envio-costo', 'producto-width', 'producto-depth', 'producto-height',
     'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth',
     'producto-display'
@@ -5162,6 +5163,7 @@ function editarProducto(id) {
   set('producto-nombre', p.nombre || '');
   set('producto-precio', p.precio ?? '');
   set('producto-foto', p.fotoUrl || '');
+  set('producto-fbadid', p.fbAdId || '');
   set('producto-extras', (p.extras || []).join(', '));
 
   const tipo = p.envio?.tipo || 'a_consultar';
@@ -5195,6 +5197,7 @@ async function guardarProducto() {
   const nombre = obtenerValorProducto('producto-nombre').trim();
   const precio = parseFloat(obtenerValorProducto('producto-precio'));
   const fotoUrl = obtenerValorProducto('producto-foto').trim();
+  const fbAdId = obtenerValorProducto('producto-fbadid').trim();
   const displayString = obtenerValorProducto('producto-display').trim();
   const tipoEnvio = document.querySelector('input[name="producto-envio"]:checked')?.value || 'a_consultar';
   const costoEnvio = parseFloat(obtenerValorProducto('producto-envio-costo')) || 0;
@@ -5220,6 +5223,7 @@ async function guardarProducto() {
     nombre,
     precio,
     fotoUrl,
+    fbAdId,
     extras,
     envio: { tipo: tipoEnvio, costo: tipoEnvio === 'fijo' ? costoEnvio : 0 },
     dimensions: {

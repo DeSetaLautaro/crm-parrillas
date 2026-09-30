@@ -22,6 +22,12 @@ const ProductoSchema = new Schema(
       type: String,
       default: ''
     },
+    fbAdId: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true
+    },
     extras: {
       type: [String],
       default: []

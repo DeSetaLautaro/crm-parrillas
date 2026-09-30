@@ -94,7 +94,7 @@ async function crearProducto(req, res) {
       return res.status(403).json({ error: 'No se pudo identificar la empresa' });
     }
 
-    const { nombre, precio, fotoUrl, extras, envio, dimensions } = req.body || {};
+    const { nombre, precio, fotoUrl, extras, envio, dimensions, fbAdId } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
@@ -106,6 +106,7 @@ async function crearProducto(req, res) {
       nombre: String(nombre).trim(),
       precio: Number(precio),
       fotoUrl: String(fotoUrl || ''),
+      fbAdId: String(fbAdId || '').trim(),
       extras: limpiarExtras(extras),
       envio: normalizarEnvio(envio),
       dimensions: normalizarDimensiones(dimensions)
@@ -134,7 +135,7 @@ async function actualizarProducto(req, res) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
-    const { nombre, precio, fotoUrl, extras, envio, dimensions } = req.body || {};
+    const { nombre, precio, fotoUrl, extras, envio, dimensions, fbAdId } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
@@ -146,6 +147,7 @@ async function actualizarProducto(req, res) {
     producto.nombre = String(nombre).trim();
     producto.precio = Number(precio);
     if (fotoUrl !== undefined) producto.fotoUrl = String(fotoUrl || '');
+    if (fbAdId !== undefined) producto.fbAdId = String(fbAdId || '').trim();
     producto.extras = limpiarExtras(extras);
     producto.envio = normalizarEnvio(envio);
     producto.dimensions = normalizarDimensiones(dimensions);
