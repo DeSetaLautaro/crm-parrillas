@@ -60,6 +60,23 @@ const ConversacionSchema = new Schema(
     longitud: {
       type: Number,
       default: null
+    },
+    // ===== Publicidad de Meta (Click-to-WhatsApp) =====
+    // source_id del anuncio desde el que llegó el cliente
+    fbAdId: {
+      type: String,
+      default: ''
+    },
+    // Producto asociado al anuncio (si matchea 1 a 1)
+    productoOrigenId: {
+      type: Types.ObjectId,
+      ref: 'Producto',
+      default: null
+    },
+    // Marca si ya enviamos el mensaje de bienvenida contextual de la publicidad
+    bienvenidaPublicidadEnviada: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

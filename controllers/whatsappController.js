@@ -41,40 +41,52 @@ async function obtenerDuracionArchivo(ruta) {
 }
 
 // Prompt por defecto (mismo que estaba hardcodeado, pero con placeholders)
-const PROMPT_IA_CONTEXTO = `Sos el asistente virtual de {nombreLocal}. Respondé de forma breve y amable a los clientes.
+const PROMPT_IA_CONTEXTO = `Sos el asistente virtual de {nombreLocal}, una parrilla. Atendés clientes por WhatsApp.
 
-Estado actual del local: {estadoLocal}.
+ESTILO (MUY IMPORTANTE):
+- Respuestas BREVES y CONCRETAS. Máximo 1 a 3 oraciones. Sin vueltas, sin introducciones largas, sin despedidas rebuscadas.
+- Hablá directo, como si atenderías el mostrador. Nada de "parafernalia".
+- Nunca uses prefijos tipo "Respuesta:" ni títulos. Solo el mensaje final.
+- No inventes datos. Si no tenés la info, decilo o derivá a un humano.
 
-Horarios de atención:
-{horarios}
+CONTEXTO DEL LOCAL:
+- Estado ahora: {estadoLocal}
+- Horarios: {horarios}
+- Información del local: {atajos}
 
-Información del local:
-{atajos}
-
-Reglas del local (instrucciones del dueño):
-{instrucciones}
-
-Catálogo actual:
+CATÁLOGO (nombre | precio | medidas | extras | envío):
 {menuTexto}
 
-Pedido actual del cliente:
-{carritoActual}
+REGLAS DEL DUEÑO (respetalas siempre):
+{instrucciones}
 
-Total del pedido: {carritoTotal}
+PEDIDO EN CURSO:
+- Carrito: {carritoActual}
+- Total: {carritoTotal}
 
-Historial reciente:
+HISTORIAL RECIENTE:
 {historialTexto}
 
-Mensaje del cliente: "{mensajeCliente}"
+MENSAJE DEL CLIENTE: "{mensajeCliente}"
 
-Redactá una respuesta que sea útil para el cliente, indicando precios y opciones disponibles. Si el cliente está por confirmar un pedido y todavía no dio dirección, pedísela sí o sí antes de confirmar.`;
+CÓMO RESPONDER:
+1. Si el cliente pregunta por un producto, contestá con precio, medidas y modalidad de envío.
+2. Si el cliente quiere comprar, pedí la DIRECCIÓN de entrega ANTES de confirmar el pedido y de cotizar el envío.
+3. Envío (según lo que diga el producto):
+   - "Envío gratis" -> aclaralo.
+   - "Envío $X" -> informá ese costo.
+   - "Envío a consultar" -> decí "el envío se cotiza según tu zona".
+4. Si el cliente pide hablar con una persona, o no podés resolver en 2 intentos, respondé "Te paso con un humano, un momento" (el sistema se encarga de la derivación).
+5. Confirmá el pedido SOLO cuando el cliente ya dio la dirección y muestra intención clara de comprar.
 
-const PROMPT_IA_DEFAULT_REGLAS = `- SIEMPRE pedí la dirección de entrega completa si todavía no la dio. No confirmes un pedido sin dirección.
-- Preguntá cómo quiere pagar: efectivo o transferencia.
-- No seas insistente con agregar productos. Si el cliente ya pidió o dijo que no quiere nada más, no vuelvas a ofrecerle más cosas.
-- Si no encontrás la información en el catálogo, ofrecé contactar a un humano.
-- Si el local está CERRADO, podés pasar el menú pero aclará de forma amable que no se están tomando pedidos hasta que abran. Igual podés registrar el pedido para cuando abran.
-- IMPORTANTE: Si el carrito actual tiene items y ya tenés la dirección de entrega, preguntá al cliente si confirma el pedido (ej: "¿Confirmamos el pedido por $X?"). Solo confirmá automáticamente cuando el cliente responda afirmativamente o muestre clara intención de avanzar (ej: "sí", "dale", "confirmo", "pago"). No confirmes ni avances con el pedido si el cliente solo envía un saludo o un mensaje que no hace referencia al pedido.`;
+Respondé ahora con el mensaje final para el cliente.`;
+
+const PROMPT_IA_DEFAULT_REGLAS = `- SIEMPRE pedí la dirección de entrega completa antes de confirmar un pedido. No confirmes sin dirección.
+- Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
+- Respuestas cortas y concretas. Nada de discursos largos.
+- Si el cliente no encuentra lo que busca o pide algo fuera del catálogo, ofrecé pasar con un humano.
+- Si el local está CERRADO, avisá de forma amable y aclarás que los pedidos se toman cuando abra.
+- IMPORTANTE: Si el carrito ya tiene items y tenés la dirección, confirmá el pedido, informá el total y preguntá cómo quiere pagar. No esperes a que el cliente diga "confirmo".`;
 
 // Convierte los horarios estructurados en texto legible para la IA
 function formatearHorarios(horarios) {
@@ -479,6 +491,11 @@ const recibirMensaje = async (req, res) => {
     const contenidoEntrada = esTexto ? textoMensaje : '📎 Envío un mensaje multimedia';
 
     const whatsappMsgId = mensaje?.id || '';
+
+    // Contexto de publicidad Click-to-WhatsApp (viene solo en el primer mensaje)
+    const referral = mensaje?.referral || null;
+    const adSourceId = (referral?.source_id || referral?.sourceId || '').toString().trim();
+
     const t0 = performance.now();
 
     console.log(`🔍 [3] Datos extraídos -> Cliente: ${telefonoCliente} | Mi Local ID: ${whatsappPhoneId} | Texto: ${esTexto ? textoMensaje : '[MULTIMEDIA]'}`);
@@ -510,9 +527,9 @@ const recibirMensaje = async (req, res) => {
     console.log(`🏢 [6] ¡Empresa encontrada!: ${empresa.nombre}`);
     const localAbierto = empresa.abierto !== false;
     
-    // Buscar el Usuario que posee la empresa para obtener sus platos
+    // Buscar el Usuario que posee la empresa (para datos auxiliares) y el catálogo desde Producto
     const usuario = await Usuario.findById(empresa.usuarioAppId).lean();
-    const productos = (usuario?.platos || []).filter(p => p.disponible !== false);
+    const productos = await Producto.find({ empresaId: empresa._id }).lean();
 
     // 🆕 Cliente nuevo?
     let esClienteNuevo = false;
@@ -547,8 +564,15 @@ const recibirMensaje = async (req, res) => {
     // Habilitación del bot para esta conversación (global de empresa y por conversación)
     const botHabilitado = (empresa.botActivo !== false) && (conversacion.botActivo !== false);
 
-    // 🎉 Mensaje de bienvenida para clientes nuevos
-    if (botHabilitado && esClienteNuevo && empresa.bienvenida && empresa.bienvenida.trim() !== '') {
+    // Si llegó por publicidad (Click-to-WhatsApp), guardar el id del anuncio en la conversación
+    if (adSourceId && !conversacion.fbAdId) {
+      conversacion.fbAdId = adSourceId;
+      await Conversacion.findByIdAndUpdate(conversacion._id, { $set: { fbAdId: adSourceId } });
+    }
+    const esPrimerMensajeDePublicidad = esTexto && !!adSourceId && !conversacion.bienvenidaPublicidadEnviada;
+
+    // 🎉 Mensaje de bienvenida para clientes nuevos (se omite si viene de publicidad)
+    if (botHabilitado && esClienteNuevo && empresa.bienvenida && empresa.bienvenida.trim() !== '' && !esPrimerMensajeDePublicidad) {
       const phoneNumberIdBienvenida = metadata?.phone_number_id || whatsappPhoneId;
       const accessTokenBienvenida = empresa.tokenMeta || process.env.WHATSAPP_ACCESS_TOKEN;
       if (phoneNumberIdBienvenida && accessTokenBienvenida) {
@@ -653,6 +677,92 @@ const recibirMensaje = async (req, res) => {
     // Si algo falla antes de este punto, respondemos 500 y Meta reintentará.
     if (!res.headersSent) {
       res.sendStatus(200);
+    }
+
+    // ===== Contexto de publicidad (Click-to-WhatsApp) =====
+    if (esPrimerMensajeDePublicidad) {
+      const productosAd = await Producto.find({ empresaId: empresa._id, fbAdId: adSourceId }).lean();
+
+      await Conversacion.findByIdAndUpdate(conversacion._id, {
+        $set: {
+          bienvenidaPublicidadEnviada: true,
+          productoOrigenId: productosAd.length === 1 ? productosAd[0]._id : null
+        }
+      });
+
+      if (productosAd.length > 0 && botHabilitado) {
+        const phoneNumberIdAd = metadata?.phone_number_id || whatsappPhoneId;
+        const accessTokenAd = empresa.tokenMeta || process.env.WHATSAPP_ACCESS_TOKEN;
+
+        let respuestaPublicidad = '';
+        if (productosAd.length === 1) {
+          const p = productosAd[0];
+          const partes = [`¡Hola! Gracias por escribirnos por la ${p.nombre} ($${p.precio}).`];
+          if (p.dimensions?.displayString) partes.push(`Medidas: ${p.dimensions.displayString}`);
+          if (Array.isArray(p.extras) && p.extras.length > 0) partes.push(`Incluye: ${p.extras.join(', ')}`);
+          if (p.envio?.tipo === 'gratis') partes.push('Envío gratis.');
+          else if (p.envio?.tipo === 'fijo') partes.push(`Envío $${Number(p.envio.costo || 0).toFixed(2)}.`);
+          else partes.push('El envío se cotiza según tu zona.');
+          partes.push('¿Querés saber algo más?');
+          respuestaPublicidad = partes.join('\n');
+        } else {
+          const lista = productosAd.map(p => `- ${p.nombre} ($${p.precio})`).join('\n');
+          respuestaPublicidad = `¡Hola! Gracias por escribirnos. Vi que llegaste por una publicidad y tenemos varias opciones:\n${lista}\n\n¿Cuál te interesa?`;
+        }
+
+        if (accessTokenAd && phoneNumberIdAd) {
+          try {
+            await fetch(`https://graph.facebook.com/v19.0/${phoneNumberIdAd}/messages`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessTokenAd}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: telefonoCliente,
+                type: 'text',
+                text: { body: respuestaPublicidad }
+              })
+            });
+            console.log('✅ Respuesta contextual de publicidad enviada');
+          } catch (error) {
+            console.error('❌ Error al enviar respuesta de publicidad:', error);
+          }
+        }
+
+        const mensajeAdDb = await Mensaje.create({
+          conversacionId: conversacion._id,
+          remitente: 'ia',
+          contenido: respuestaPublicidad
+        });
+
+        await Conversacion.findByIdAndUpdate(conversacion._id, {
+          $set: { ultimoMensaje: respuestaPublicidad }
+        });
+
+        const ioAd = req.app.get('io');
+        if (ioAd) {
+          ioAd.to(empresa._id.toString()).emit('mensaje-nuevo', {
+            conversacionId: conversacion._id,
+            mensaje: {
+              _id: mensajeAdDb._id,
+              remitente: 'ia',
+              contenido: respuestaPublicidad,
+              estado: 'enviado',
+              fecha: new Date()
+            },
+            conversacion: {
+              _id: conversacion._id,
+              ultimoMensaje: respuestaPublicidad,
+              updatedAt: new Date()
+            }
+          });
+        }
+
+        console.log(`✅ [PUBLICIDAD] Respuesta contextual enviada (fbAdId=${adSourceId}, productos=${productosAd.length})`);
+        return;
+      }
     }
 
     // ===== Manejo de mensajes multimedia (imagen, audio, video, etc.) =====
@@ -1349,15 +1459,13 @@ JSON:`;
       try {
         const menuTexto = productos.length
           ? productos.map(p => {
-              let detalleExtras = '';
-              if (p.toppings && p.toppings.length > 0) {
-                detalleExtras = p.toppings.map(g => {
-                  const opciones = Array.isArray(g.opciones) ? g.opciones.join(', ') : '';
-                  return `${g.grupo || ''}: ${opciones}`.trim();
-                }).filter(Boolean).join('; ');
-                detalleExtras = ` (extras: ${detalleExtras})`;
-              }
-              return `- ${p.nombre} ($${p.precio})${detalleExtras}`;
+              const partes = [`- ${p.nombre} ($${p.precio})`];
+              if (p.dimensions?.displayString) partes.push(`Medidas: ${p.dimensions.displayString}`);
+              if (Array.isArray(p.extras) && p.extras.length > 0) partes.push(`Incluye: ${p.extras.join(', ')}`);
+              if (p.envio?.tipo === 'gratis') partes.push('Envío gratis');
+              else if (p.envio?.tipo === 'fijo') partes.push(`Envío $${Number(p.envio.costo || 0).toFixed(2)}`);
+              else partes.push('Envío a consultar');
+              return partes.join(' | ');
             }).join('\n')
           : 'No hay productos cargados en el catálogo.';
 
@@ -2984,7 +3092,7 @@ async function generarPedidoManual(req, res) {
 
     const empresa = await Empresa.findById(conversacion.empresaId);
     const usuario = await Usuario.findById(empresa.usuarioAppId).lean();
-    const productos = (usuario?.platos || []).filter(p => p.disponible !== false);
+    const productos = await Producto.find({ empresaId: empresa._id }).lean();
 
     const contacto = await Cliente.findById(conversacion.contactoId);
     if (!contacto) return res.status(404).json({ error: 'Contacto no encontrado' });

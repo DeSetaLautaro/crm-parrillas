@@ -177,12 +177,12 @@ let ATAJOS_RAPIDOS = [];
 let atajosMenuVisible = false;
 
 // Prompt original por defecto (mismo que el backend PROMPT_IA_DEFAULT)
-const PROMPT_DEFAULT = `- SIEMPRE pedí la dirección de entrega completa si todavía no la dio. No confirmes un pedido sin dirección.
-- Preguntá cómo quiere pagar: efectivo o transferencia.
-- No seas insistente con agregar productos. Si el cliente ya pidió o dijo que no quiere nada más, no vuelvas a ofrecerle más cosas.
-- Si no encontrás la información en el catálogo, ofrecé contactar a un humano.
-- Si el local está CERRADO, podés pasar el menú pero aclará de forma amable que no se están tomando pedidos hasta que abran. Igual podés registrar el pedido para cuando abran.
-- IMPORTANTE: Si el carrito actual tiene items y ya tenés la dirección de entrega del cliente, confirmá el pedido automáticamente, informá el total, preguntá cómo quiere pagar (si no lo dijo) y despedite amablemente. No esperes a que el cliente diga "confirmo".`;
+const PROMPT_DEFAULT = `- SIEMPRE pedí la dirección de entrega completa antes de confirmar un pedido. No confirmes sin dirección.
+- Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
+- Respuestas cortas y concretas. Nada de discursos largos.
+- Si el cliente no encuentra lo que busca o pide algo fuera del catálogo, ofrecé pasar con un humano.
+- Si el local está CERRADO, avisá de forma amable y aclarás que los pedidos se toman cuando abra.
+- IMPORTANTE: Si el carrito ya tiene items y tenés la dirección, confirmá el pedido, informá el total y preguntá cómo quiere pagar. No esperes a que el cliente diga "confirmo".`;
 
 // ===== Helpers =====
 function escaparHTML(texto) {
