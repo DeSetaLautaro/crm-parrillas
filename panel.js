@@ -374,8 +374,73 @@ function getMensajesDeConversacion(convId) {
   return MENSAJES.filter(m => m.conversacionId === convId);
 }
 
-function formatearHora(fecha) {
+function esMismoDia(fechaA, fechaB) {
+  return fechaA.getFullYear() === fechaB.getFullYear()
+    && fechaA.getMonth() === fechaB.getMonth()
+    && fechaA.getDate() === fechaB.getDate();
+}
+
+function formatearHoraCorta(fecha) {
   return fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Formato inteligente de fecha para la lista de chats:
+//   hoy    -> "14:35"
+//   ayer   -> "Ayer 14:35"
+//   <7d    -> "Lunes 14:35"
+//   más    -> "12/09/25 14:35"
+function formatearFechaMensaje(fecha) {
+  const f = fecha instanceof Date ? fecha : new Date(fecha);
+  const ahora = new Date();
+  const ayer = new Date(ahora);
+  ayer.setDate(ahora.getDate() - 1);
+
+  const hora = formatearHoraCorta(f);
+
+  if (esMismoDia(f, ahora)) return hora;
+  if (esMismoDia(f, ayer)) return `Ayer ${hora}`;
+
+  const diffDias = Math.floor((ahora.getTime() - f.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDias < 7) {
+    const diaSemana = f.toLocaleDateString('es-AR', { weekday: 'long' });
+    return `${diaSemana.charAt(0).toUpperCase()}${diaSemana.slice(1)} ${hora}`;
+  }
+
+  const dd = String(f.getDate()).padStart(2, '0');
+  const mm = String(f.getMonth() + 1).padStart(2, '0');
+  const yy = String(f.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy} ${hora}`;
+}
+
+function formatearHora(fecha) {
+  return formatearFechaMensaje(fecha);
+}
+
+// Etiqueta del separador de día (estilo WhatsApp):
+//   "HOY", "AYER", "LUNES", ... o "12 DE SEPTIEMBRE"
+function etiquetaDiaSeparador(fecha) {
+  const f = fecha instanceof Date ? fecha : new Date(fecha);
+  const ahora = new Date();
+  const ayer = new Date(ahora);
+  ayer.setDate(ahora.getDate() - 1);
+
+  if (esMismoDia(f, ahora)) return 'HOY';
+  if (esMismoDia(f, ayer)) return 'AYER';
+
+  const diffDias = Math.floor((ahora.getTime() - f.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDias < 7) {
+    const diaSemana = f.toLocaleDateString('es-AR', { weekday: 'long' });
+    return diaSemana.toUpperCase();
+  }
+
+  return f.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }).toUpperCase();
+}
+
+// HTML de un separador de día
+function htmlSeparadorDia(fecha) {
+  return `<div class="separador-dia" style="align-self:center; margin:12px 0 8px;">
+    <span style="background:#e5e7eb; color:#6b7280; font-size:11px; padding:3px 12px; border-radius:12px; text-transform:uppercase; font-weight:600; letter-spacing:0.03em;">${etiquetaDiaSeparador(fecha)}</span>
+  </div>`;
 }
 
 function formatearFechaTooltip(fecha) {
@@ -788,11 +853,18 @@ function renderChatActivo() {
   const mensajes = getMensajesDeConversacion(conv._id);
   console.log('[renderChatActivo] chat:', chatActivoId, '| mensajes en memoria:', mensajes.length);
 
-  const mensajesHTML = mensajes.map(msg => {
+  const mensajesHTML = mensajes.map((msg, idx) => {
     let claseBurbuja = '';
-    if (msg.remitente === 'cliente') claseBurbuja = 'bubble-cliente';
+    const esCliente = msg.remitente === 'cliente';
+    if (esCliente) claseBurbuja = 'bubble-cliente';
     else if (['bot', 'humano', 'ia', 'empresa'].includes(msg.remitente)) claseBurbuja = 'bubble-humano';
     else if (msg.remitente === 'nota_interna') claseBurbuja = 'bubble-nota';
+
+    const fechaMsg = msg.fecha instanceof Date ? msg.fecha : new Date(msg.fecha);
+    const fechaPrev = idx > 0
+      ? (mensajes[idx - 1].fecha instanceof Date ? mensajes[idx - 1].fecha : new Date(mensajes[idx - 1].fecha))
+      : null;
+    const separador = (!fechaPrev || !esMismoDia(fechaMsg, fechaPrev)) ? htmlSeparadorDia(fechaMsg) : '';
 
     const contenidoSeguro = escaparHTML(msg.contenido || '').replace(/\n/g, '<br>');
     let contenidoFinal = contenidoSeguro;
@@ -821,8 +893,12 @@ function renderChatActivo() {
         indicador = `<span class="mensaje-estado" title="${titulo}" style="font-size:13px; font-weight:bold; color:${color}; margin-left:6px; line-height:1;">${simbolo}</span>`;
       }
     }
-    const estiloMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo) ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
-    return `<div class="bubble ${claseBurbuja}"${estiloMedia}>${contenidoFinal}${indicador}</div>`;
+    const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo);
+    const estiloMedia = esMedia ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
+    const horaTexto = formatearHoraCorta(fechaMsg);
+    const colorHora = (esCliente || esMedia) ? '#6b7280' : 'rgba(255,255,255,0.85)';
+    const horaHTML = `<time class="bubble-hora" title="${formatearFechaTooltip(fechaMsg)}" style="display:block; font-size:10px; margin-top:3px; text-align:right; color:${colorHora}; line-height:1;">${horaTexto}</time>`;
+    return `${separador}<div class="bubble ${claseBurbuja}"${estiloMedia}>${contenidoFinal}${indicador}${horaHTML}</div>`;
   }).join('');
 
   const botonCargarMas = conv.tieneMas
@@ -2889,11 +2965,18 @@ async function cargarMasMensajes() {
     const prevScrollTop = area ? area.scrollTop : 0;
 
     // Insertar los mensajes nuevos en el DOM sin re-renderizar todo el chat
-    const htmlNuevos = unicos.map(msg => {
+    const htmlNuevos = unicos.map((msg, idx) => {
       let claseBurbuja = '';
-      if (msg.remitente === 'cliente') claseBurbuja = 'bubble-cliente';
+      const esCliente = msg.remitente === 'cliente';
+      if (esCliente) claseBurbuja = 'bubble-cliente';
       else if (['bot', 'humano', 'ia', 'empresa'].includes(msg.remitente)) claseBurbuja = 'bubble-humano';
       else if (msg.remitente === 'nota_interna') claseBurbuja = 'bubble-nota';
+
+      const fechaMsg = msg.fecha instanceof Date ? msg.fecha : new Date(msg.fecha);
+      const fechaPrev = idx > 0
+        ? (unicos[idx - 1].fecha instanceof Date ? unicos[idx - 1].fecha : new Date(unicos[idx - 1].fecha))
+        : null;
+      const separador = (!fechaPrev || !esMismoDia(fechaMsg, fechaPrev)) ? htmlSeparadorDia(fechaMsg) : '';
 
       const contenidoSeguro = escaparHTML(msg.contenido || '').replace(/\n/g, '<br>');
       let contenidoFinal = contenidoSeguro;
@@ -2919,8 +3002,12 @@ async function cargarMasMensajes() {
           indicador = `<span class="mensaje-estado" title="${titulo}" style="font-size:13px; font-weight:bold; color:${color}; margin-left:6px; line-height:1;">${simbolo}</span>`;
         }
       }
-      const estiloMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo) ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
-      return `<div class="bubble ${claseBurbuja}"${estiloMedia}>${contenidoFinal}${indicador}</div>`;
+      const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo);
+      const estiloMedia = esMedia ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
+      const horaTexto = formatearHoraCorta(fechaMsg);
+      const colorHora = (esCliente || esMedia) ? '#6b7280' : 'rgba(255,255,255,0.85)';
+      const horaHTML = `<time class="bubble-hora" title="${formatearFechaTooltip(fechaMsg)}" style="display:block; font-size:10px; margin-top:3px; text-align:right; color:${colorHora}; line-height:1;">${horaTexto}</time>`;
+      return `${separador}<div class="bubble ${claseBurbuja}"${estiloMedia}>${contenidoFinal}${indicador}${horaHTML}</div>`;
     }).join('');
 
     if (area) {
