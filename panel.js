@@ -182,6 +182,7 @@ const PROMPT_DEFAULT = `- SIEMPRE pedí la dirección de entrega completa antes 
 - Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
 - Respuestas cortas y concretas. Nada de discursos largos.
 - Si el cliente no encuentra lo que busca o pide algo fuera del catálogo, respondé con lo que tengas disponible o aclarale que lo vas a consultar con el local. No derives a un humano.
+- El bot atiende siempre, no cierra. Si el cliente pregunta en qué horario hay una persona disponible, respondé con el horario del local.
 - Si el local está CERRADO, avisá de forma amable y aclarás que los pedidos se toman cuando abra.
 - IMPORTANTE: Si el carrito ya tiene items y tenés la dirección, confirmá el pedido, informá el total y preguntá cómo quiere pagar. No esperes a que el cliente diga "confirmo".`;
 
@@ -1252,6 +1253,14 @@ async function cargarConfiguracion() {
         `;
         horariosWrap.appendChild(div);
       });
+
+      // Detectar modo "Abierto 24hs" (todos los días en 00:00-23:59)
+      const toggle24 = document.getElementById('horarios-abierto-24hs');
+      if (toggle24) {
+        const es24 = esHorario24hs(horarios);
+        toggle24.checked = es24;
+        aplicarEstado24hsUI(es24);
+      }
     }
 
     const estadoDisplay = document.getElementById('perfil-estado-display');
@@ -1949,19 +1958,78 @@ async function guardarAtajosDesdePanel({ mostrarCartel = true } = {}) {
   }
 }
 
+// ===== Horarios: helpers =====
+const HORA_APERTURA_24HS = '00:00';
+const HORA_CIERRE_24HS = '23:59';
+
+// Detecta si TODOS los días cargados están en 00:00-23:59 (=> modo "Abierto 24hs")
+function esHorario24hs(horarios) {
+  if (!Array.isArray(horarios) || horarios.length === 0) return false;
+  return horarios.every(h =>
+    h.apertura === HORA_APERTURA_24HS && h.cierre === HORA_CIERRE_24HS
+  );
+}
+
+// Habilita/deshabilita los inputs según el modo 24hs
+function aplicarEstado24hsUI(activo) {
+  document.querySelectorAll('.horario-apertura, .horario-cierre').forEach(inp => {
+    inp.disabled = activo;
+  });
+  const btnLV = document.getElementById('btn-aplicar-lv');
+  if (btnLV) btnLV.disabled = activo;
+}
+
+// Toggle "Abierto 24hs": al activar, completa los 7 días con 00:00-23:59
+function toggleAbierto24hs(e) {
+  const activo = e.target.checked;
+  if (activo) {
+    document.querySelectorAll('.horario-apertura').forEach(inp => { inp.value = HORA_APERTURA_24HS; });
+    document.querySelectorAll('.horario-cierre').forEach(inp => { inp.value = HORA_CIERRE_24HS; });
+  }
+  aplicarEstado24hsUI(activo);
+}
+
+// Copia el horario del lunes a martes/miércoles/jueves/viernes (solo UI)
+function aplicarHorarioLunesAViernes() {
+  const lunesApertura = document.querySelector('.horario-apertura[data-dia="lunes"]')?.value || '';
+  const lunesCierre = document.querySelector('.horario-cierre[data-dia="lunes"]')?.value || '';
+  if (!lunesApertura || !lunesCierre) {
+    mostrarToast('Completá primero el horario del lunes', 'error');
+    return;
+  }
+  ['martes','miércoles','jueves','viernes'].forEach(dia => {
+    const o = document.querySelector(`.horario-apertura[data-dia="${dia}"]`);
+    const c = document.querySelector(`.horario-cierre[data-dia="${dia}"]`);
+    if (o) o.value = lunesApertura;
+    if (c) c.value = lunesCierre;
+  });
+  mostrarToast('Se copió el horario del lunes a martes, miércoles, jueves y viernes. Acordate de guardar.', 'info');
+}
+
 function guardarHorariosDesdePanel() {
   const inputsOpen = document.querySelectorAll('.horario-apertura');
   const inputsClose = document.querySelectorAll('.horario-cierre');
-  const horarios = [];
 
+  // Indexamos los cierres por día (NodeList no tiene .find())
+  const cierresPorDia = {};
+  inputsClose.forEach(inp => {
+    cierresPorDia[inp.dataset.dia] = inp.value;
+  });
+
+  const horarios = [];
   inputsOpen.forEach(inp => {
     const dia = inp.dataset.dia;
     const apertura = inp.value;
-    const cierre = inputsClose.find(c => c.dataset.dia === dia)?.value || '';
+    const cierre = cierresPorDia[dia] || '';
     if (dia && apertura && cierre) {
       horarios.push({ dia, apertura, cierre });
     }
   });
+
+  if (horarios.length === 0) {
+    mostrarToast('No hay horarios completos para guardar (necesitás apertura y cierre por día)', 'error');
+    return;
+  }
 
   const token = localStorage.getItem('token') || '';
   fetch('/api/whatsapp/config', {
@@ -1972,9 +2040,12 @@ function guardarHorariosDesdePanel() {
     .then(res => res.json())
     .then(data => {
       if (data.ok) mostrarToast('Horarios guardados correctamente', 'info');
-      else mostrarToast('Error al guardar horarios', 'error');
+      else mostrarToast(data.error || 'Error al guardar horarios', 'error');
     })
-    .catch(err => console.error(err));
+    .catch(err => {
+      console.error('Error al guardar horarios:', err);
+      mostrarToast('Error de red al guardar horarios', 'error');
+    });
 }
 
 function agregarAtajo() {
@@ -4545,6 +4616,10 @@ async function init() {
   initEditarBienvenida();
   const btnGuardarHorarios = document.getElementById('btn-guardar-horarios');
   if (btnGuardarHorarios) btnGuardarHorarios.addEventListener('click', guardarHorariosDesdePanel);
+  const btnAplicarLV = document.getElementById('btn-aplicar-lv');
+  if (btnAplicarLV) btnAplicarLV.addEventListener('click', aplicarHorarioLunesAViernes);
+  const toggle24 = document.getElementById('horarios-abierto-24hs');
+  if (toggle24) toggle24.addEventListener('change', toggleAbierto24hs);
   const inputFoto = document.getElementById('config-foto');
   if (inputFoto) inputFoto.addEventListener('change', previewFoto);
 

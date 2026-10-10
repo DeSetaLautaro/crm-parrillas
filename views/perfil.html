@@ -30,9 +30,21 @@
       <button class="perfil-campo-editar" id="btn-editar-bienvenida" title="Editar bienvenida">✏️</button>
     </div>
     <div class="perfil-nombre-fila" style="flex-direction:column; align-items:stretch;">
-      <label class="perfil-campo-label">Horarios de atención</label>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px; width:100%;">
+        <label class="perfil-campo-label" style="margin-bottom:0;">Horarios de atención</label>
+        <label class="checkbox-linea" style="font-weight:500;">
+          <input type="checkbox" id="horarios-abierto-24hs">
+          <span>Abierto 24hs</span>
+        </label>
+      </div>
       <div id="horarios-container" style="margin-bottom:10px;"></div>
-      <button id="btn-guardar-horarios" type="button" style="align-self:flex-start; padding:8px 16px;">Guardar Horarios</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-self:flex-start;">
+        <button id="btn-aplicar-lv" type="button" style="padding:8px 16px;">Aplicar Lunes a Viernes</button>
+        <button id="btn-guardar-horarios" type="button" style="padding:8px 16px;">Guardar Horarios</button>
+      </div>
+      <p style="font-size:12px; color:#9CA3AF; margin-top:8px;">
+        El bot responde SIEMPRE, incluso fuera del horario. Estos horarios se usan para informar al cliente cuándo hay atención humana disponible.
+      </p>
     </div>
   </div>
 
