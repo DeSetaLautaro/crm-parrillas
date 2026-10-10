@@ -202,7 +202,7 @@ async function procesarCarrito(empresa, conversacion, texto, productos) {
   if (!process.env.GEMINI_API_KEY) return null;
   try {
     const menu = productos.map(p => `- ${p.nombre} ($${p.precio})`).join('\n');
-    const prompt = `Actúa como sistema de punto de venta. El cliente escribió: "${texto}".
+    let prompt = `Actúa como sistema de punto de venta. El cliente escribió: "${texto}".
       Interpretá el pedido y devolvé un JSON con la estructura:
       {
         "items": [
