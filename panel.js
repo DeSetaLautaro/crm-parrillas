@@ -234,7 +234,7 @@ function urlFotoConToken(url) {
   return `${urlRectificada}${sep}token=${encodeURIComponent(token)}`;
 }
 
-function mostrarToast(mensaje, tipo = 'info') {
+function mostrarToast(mensaje, tipo = 'info', duracionMs = 15000) {
   let contenedor = document.getElementById('toast-container');
   if (!contenedor) {
     contenedor = document.createElement('div');
@@ -243,16 +243,28 @@ function mostrarToast(mensaje, tipo = 'info') {
     document.body.appendChild(contenedor);
   }
   const toast = document.createElement('div');
-  toast.style.cssText = `background:${tipo === 'error' ? '#ef4444' : '#3b82f6'};color:#fff;padding:14px 18px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);font-weight:bold;max-width:350px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;`;
-  
+  toast.style.cssText = `background:${tipo === 'error' ? '#ef4444' : '#3b82f6'};color:#fff;padding:14px 18px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3);font-weight:bold;max-width:350px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;opacity:1;transition:opacity .35s ease;`;
+
   const textoSpan = document.createElement('span');
   textoSpan.textContent = mensaje;
-  
+
   const btnCerrar = document.createElement('button');
   btnCerrar.textContent = '×';
   btnCerrar.style.cssText = 'background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;';
-  btnCerrar.addEventListener('click', () => toast.remove());
-  
+
+  let timerAutoCierre = null;
+  const cerrarToast = () => {
+    if (timerAutoCierre) { clearTimeout(timerAutoCierre); timerAutoCierre = null; }
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 350);
+  };
+  btnCerrar.addEventListener('click', cerrarToast);
+
+  // Auto-cierre para no obligar al usuario a cerrarlo a mano.
+  if (typeof duracionMs === 'number' && duracionMs > 0) {
+    timerAutoCierre = setTimeout(cerrarToast, duracionMs);
+  }
+
   toast.appendChild(textoSpan);
   toast.appendChild(btnCerrar);
   contenedor.appendChild(toast);
@@ -2815,6 +2827,7 @@ async function cargarConversaciones() {
     if (typeof io !== 'undefined' && !socket) {
       socket = io({
         reconnection: true,
+        reconnectionAttempts: 20,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
         timeout: 20000
@@ -3014,21 +3027,52 @@ async function actualizarUsoConversaciones() {
 function setupSocketListeners() {
   if (!socket) return;
 
+  // Silenciamos reconexiones cortas (bfcache, cambios de red, pm2 restart).
+  // Solo avisamos cuando la desconexión se extiende o cuando socket.io se rinde.
+  let timerDesconexion = null;
+  let avisoDesconexionMostrado = false;
+  const UMBRAL_AVISO_MS = 8000;
+
   socket.on('disconnect', () => {
-    mostrarToast('Se perdió la conexión en tiempo real. Reconectando...', 'error');
+    if (timerDesconexion) clearTimeout(timerDesconexion);
+    timerDesconexion = setTimeout(() => {
+      avisoDesconexionMostrado = true;
+      mostrarToast('Se perdió la conexión con el servidor. Reconectando...', 'error');
+    }, UMBRAL_AVISO_MS);
   });
 
   socket.on('reconnect', () => {
-    mostrarToast('Conexión restablecida', 'info');
+    if (timerDesconexion) { clearTimeout(timerDesconexion); timerDesconexion = null; }
+    if (avisoDesconexionMostrado) {
+      mostrarToast('Conexión restablecida', 'info');
+      avisoDesconexionMostrado = false;
+    }
     const salas = [...new Set(CONVERSACIONES.map(c => c.empresaId).filter(Boolean))];
     salas.forEach(sala => socket.emit('join', sala));
     cargarConversaciones();
   });
 
+  socket.on('reconnect_failed', () => {
+    if (timerDesconexion) { clearTimeout(timerDesconexion); timerDesconexion = null; }
+    mostrarToast('No se pudo restablecer la conexión. Recargá la página para seguir recibiendo mensajes.', 'error', 0);
+  });
+
   socket.on('connect', () => {
+    if (timerDesconexion) { clearTimeout(timerDesconexion); timerDesconexion = null; }
+    avisoDesconexionMostrado = false;
     const salas = [...new Set(CONVERSACIONES.map(c => c.empresaId).filter(Boolean))];
     salas.forEach(sala => socket.emit('join', sala));
   });
+
+  // Cuando el navegador restaura la pestaña desde bfcache, el WebSocket ya está muerto: reconectamos explícitamente.
+  if (!window.__bfcacheListenerInstalado) {
+    window.__bfcacheListenerInstalado = true;
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted && socket && !socket.connected) {
+        socket.connect();
+      }
+    });
+  }
 
   socket.on('mensaje-nuevo', (payload) => {
     const { conversacionId, mensaje, conversacion } = payload;
