@@ -180,7 +180,7 @@ let atajosMenuVisible = false;
 const PROMPT_DEFAULT = `- SIEMPRE pedí la dirección de entrega completa antes de confirmar un pedido. No confirmes sin dirección.
 - Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
 - Respuestas cortas y concretas. Nada de discursos largos.
-- Si el cliente no encuentra lo que busca o pide algo fuera del catálogo, ofrecé pasar con un humano.
+- Si el cliente no encuentra lo que busca o pide algo fuera del catálogo, respondé con lo que tengas disponible o aclarale que lo vas a consultar con el local. No derives a un humano.
 - Si el local está CERRADO, avisá de forma amable y aclarás que los pedidos se toman cuando abra.
 - IMPORTANTE: Si el carrito ya tiene items y tenés la dirección, confirmá el pedido, informá el total y preguntá cómo quiere pagar. No esperes a que el cliente diga "confirmo".`;
 
