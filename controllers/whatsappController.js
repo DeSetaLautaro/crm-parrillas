@@ -1513,7 +1513,7 @@ JSON:`;
         const atajosCombinados = combinarAtajos(usuario, empresa);
         const atajosTexto = atajosCombinados.map(a => `- ${a.comando} → ${a.respuesta}`).join('\n');
 
-        const prompt = PROMPT_IA_CONTEXTO
+        let prompt = PROMPT_IA_CONTEXTO
           .replace('{instrucciones}', instruccionesUsuario)
           .replaceAll('{nombreLocal}', empresa.nombre)
           .replaceAll('{estadoLocal}', estadoLocal)
