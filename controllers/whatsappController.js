@@ -113,8 +113,8 @@ function formatearHorarios(horarios) {
   return ordenados.map(h => `${h.dia}: ${h.apertura} a ${h.cierre}`).join(', ');
 }
 
-// Genera atajos automáticos basados en datos del Usuario (dueño del local)
-function generarAtajosAutomaticos(usuario) {
+// Genera atajos automáticos basados en datos del Usuario (dueño del local) y de la Empresa
+function generarAtajosAutomaticos(usuario, empresa) {
   const atajos = [];
   if (!usuario) return atajos;
 
@@ -132,8 +132,11 @@ function generarAtajosAutomaticos(usuario) {
     });
   }
 
-  // 2. Horarios de atención
-  const horariosTexto = formatearHorarios(usuario.horariosEstructurados || []);
+  // 2. Horarios de atención (siempre desde la Empresa, no del Usuario)
+  const horariosFuente = (empresa && Array.isArray(empresa.horariosEstructurados))
+    ? empresa.horariosEstructurados
+    : [];
+  const horariosTexto = formatearHorarios(horariosFuente);
   if (horariosTexto && horariosTexto !== 'No configurados') {
     atajos.push({
       comando: 'horarios',
@@ -177,7 +180,7 @@ function generarAtajosAutomaticos(usuario) {
 
 // Combina atajos automáticos con los manuales guardados en la empresa
 function combinarAtajos(usuario, empresa) {
-  const atajosAuto = generarAtajosAutomaticos(usuario);
+  const atajosAuto = generarAtajosAutomaticos(usuario, empresa);
   const atajosManuales = (empresa && Array.isArray(empresa.atajos)) ? empresa.atajos : [];
 
   const comandosAuto = new Set(atajosAuto.map(a => a.comando));
@@ -1505,10 +1508,8 @@ JSON:`;
           ? empresa.promptIA.trim()
           : PROMPT_IA_DEFAULT_REGLAS;
 
-        const horariosEmpresa = (empresa.horariosEstructurados && empresa.horariosEstructurados.length > 0)
-          ? empresa.horariosEstructurados
-          : (usuario?.horariosEstructurados || []);
-        const horariosTexto = formatearHorarios(horariosEmpresa);
+        // Los horarios viven SOLO en la Empresa. Ya no hay fallback al Usuario.
+        const horariosTexto = formatearHorarios(empresa.horariosEstructurados || []);
 
         const atajosCombinados = combinarAtajos(usuario, empresa);
         const atajosTexto = atajosCombinados.map(a => `- ${a.comando} → ${a.respuesta}`).join('\n');
@@ -2603,24 +2604,19 @@ const obtenerConfig = async (req, res) => {
     console.log('[obtenerConfig] horarios de EMPRESA:', empresa.horariosEstructurados);
     console.log('[obtenerConfig] usuarioAppId:', empresa.usuarioAppId);
 
-    // Si la empresa no tiene horarios cargados, usamos los del Usuario como referencia visual
-    let horarios = empresa.horariosEstructurados || [];
-    let usuario = null;
-    if (empresa.usuarioAppId) {
-      usuario = await Usuario.findById(empresa.usuarioAppId).lean();
-      console.log('[obtenerConfig] horarios de USUARIO:', usuario?.horariosEstructurados);
-      if ((!horarios || horarios.length === 0) && usuario && Array.isArray(usuario.horariosEstructurados) && usuario.horariosEstructurados.length > 0) {
-        horarios = usuario.horariosEstructurados;
-      }
-    }
-
-    // Normalizar día a minúsculas para que el frontend y el cron funcionen consistente
-    horarios = horarios.map(h => ({
+    // Los horarios viven SOLO en la Empresa. El Usuario ya no se consulta como fallback.
+    let horarios = (empresa.horariosEstructurados || []).map(h => ({
       ...h,
       dia: (h.dia || '').toLowerCase()
     }));
 
     console.log('[obtenerConfig] horarios FINAL que se devuelven:', horarios);
+
+    // El usuario se sigue cargando para combinar los atajos automáticos (dirección, pago)
+    let usuario = null;
+    if (empresa.usuarioAppId) {
+      usuario = await Usuario.findById(empresa.usuarioAppId).lean();
+    }
 
     const atajos = combinarAtajos(usuario, empresa);
 
