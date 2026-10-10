@@ -78,8 +78,18 @@ CÓMO RESPONDER:
    - "Envío a consultar" -> decí "el envío se cotiza según tu zona".
 4. Si el cliente pide hablar con una persona, o no podés resolver en 2 intentos, respondé "Te paso con un humano, un momento" (el sistema se encarga de la derivación).
 5. Confirmá el pedido SOLO cuando el cliente ya dio la dirección y muestra intención clara de comprar.
+6. Si el cliente pide explícitamente ver la FOTO de un producto del catálogo, y ese producto figura con "Con foto", mandá la foto (ver formato abajo). No ofrezcas fotos de productos que figuran "Sin foto".
 
-Respondé ahora con el mensaje final para el cliente.`;
+FORMATO DE RESPUESTA (MUY IMPORTANTE):
+Respondé SIEMPRE con un objeto JSON válido, sin markdown, sin bloques de código y sin texto extra. Usá uno de estos dos formatos exactos:
+
+• Para respuestas de texto:
+{"tipo": "texto", "respuesta": "tu mensaje para el cliente"}
+
+• Para enviar la foto de un producto:
+{"tipo": "imagen", "producto": "nombre exacto del producto tal como figura en el catálogo", "caption": "texto breve que acompañará la foto"}
+
+El campo "respuesta" o "caption" debe ser el mensaje final listo para enviar por WhatsApp. No agregues nada fuera del JSON.`;
 
 const PROMPT_IA_DEFAULT_REGLAS = `- SIEMPRE pedí la dirección de entrega completa antes de confirmar un pedido. No confirmes sin dirección.
 - Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
@@ -1465,6 +1475,7 @@ JSON:`;
               if (p.envio?.tipo === 'gratis') partes.push('Envío gratis');
               else if (p.envio?.tipo === 'fijo') partes.push(`Envío $${Number(p.envio.costo || 0).toFixed(2)}`);
               else partes.push('Envío a consultar');
+              partes.push(p.fotoUrl ? 'Con foto' : 'Sin foto');
               return partes.join(' | ');
             }).join('\n')
           : 'No hay productos cargados en el catálogo.';
@@ -1520,7 +1531,31 @@ JSON:`;
       }
     }
 
+    // Parsear salida estructurada del modelo (texto o imagen)
+    let tipoRespuestaIA = 'texto';
+    let productoFotoIA = null;
+    let urlArchivoIA = '';
     if (respuestaIA) {
+      const raw = String(respuestaIA).trim().replace(/```json/gi, '').replace(/```/g, '').trim();
+      if (raw.startsWith('{') && raw.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.tipo === 'imagen' && parsed.producto) {
+              tipoRespuestaIA = 'imagen';
+              productoFotoIA = String(parsed.producto).trim();
+              respuestaIA = (typeof parsed.caption === 'string') ? parsed.caption.trim() : '';
+            } else if (parsed.tipo === 'texto' && typeof parsed.respuesta === 'string') {
+              respuestaIA = parsed.respuesta.trim();
+            }
+          }
+        } catch (_) {
+          // No era JSON: se mantiene el texto tal cual
+        }
+      }
+    }
+
+    if (respuestaIA || tipoRespuestaIA === 'imagen') {
       // Enviar la respuesta al cliente por WhatsApp
       const phoneNumberId = metadata?.phone_number_id || whatsappPhoneId;
       const accessToken = empresa.tokenMeta || process.env.WHATSAPP_ACCESS_TOKEN;
@@ -1528,32 +1563,63 @@ JSON:`;
 
       if (accessToken) {
         try {
-          const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
-          const respuestaNormalizada = respuestaIA.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-          const payload = {
-            messaging_product: 'whatsapp',
-            to: telefonoCliente,
-            type: 'text',
-            text: { body: respuestaNormalizada }
-          };
+          if (tipoRespuestaIA === 'imagen' && productoFotoIA) {
+            // Buscar el producto por nombre exacto (o por coincidencia parcial)
+            const nombreBuscado = productoFotoIA.toLowerCase();
+            const productoFoto = productos.find(p => String(p.nombre || '').toLowerCase() === nombreBuscado)
+              || productos.find(p => String(p.nombre || '').toLowerCase().includes(nombreBuscado));
 
-          console.log(`📤 Enviando respuesta IA al teléfono ${telefonoCliente} usando phoneNumberId ${phoneNumberId}`);
-
-          const resp = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          const respBody = await resp.json().catch(() => ({}));
-          msgIdIA = respBody?.messages?.[0]?.id || '';
-          if (!resp.ok) {
-            console.error('❌ Error al enviar respuesta IA a WhatsApp:', resp.status, respBody);
+            if (productoFoto && productoFoto.fotoUrl) {
+              const resultadoImg = await enviarImagenMeta(empresa, telefonoCliente, productoFoto.fotoUrl, respuestaIA);
+              if (resultadoImg.ok) {
+                msgIdIA = resultadoImg.msgId;
+                urlArchivoIA = productoFoto.fotoUrl;
+                console.log(`✅ Imagen del producto "${productoFoto.nombre}" enviada a WhatsApp`);
+              } else {
+                console.error('❌ Error al enviar imagen:', resultadoImg.error);
+                // Fallback: mandar el caption como texto (si hay)
+                if (respuestaIA) {
+                  const resultadoTexto = await enviarMensajeMeta(empresa, telefonoCliente, respuestaIA);
+                  if (resultadoTexto.ok) msgIdIA = resultadoTexto.msgId;
+                }
+                tipoRespuestaIA = 'texto';
+              }
+            } else {
+              // El producto no tiene foto o no se encontró: fallback a texto
+              const textoFallback = respuestaIA || 'No tengo esa foto disponible en este momento.';
+              const resultadoTexto = await enviarMensajeMeta(empresa, telefonoCliente, textoFallback);
+              if (resultadoTexto.ok) msgIdIA = resultadoTexto.msgId;
+              respuestaIA = textoFallback;
+              tipoRespuestaIA = 'texto';
+            }
           } else {
-            console.log('✅ Respuesta IA enviada a WhatsApp correctamente');
+            const url = `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`;
+            const respuestaNormalizada = (respuestaIA || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const payload = {
+              messaging_product: 'whatsapp',
+              to: telefonoCliente,
+              type: 'text',
+              text: { body: respuestaNormalizada }
+            };
+
+            console.log(`📤 Enviando respuesta IA al teléfono ${telefonoCliente} usando phoneNumberId ${phoneNumberId}`);
+
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(payload)
+            });
+
+            const respBody = await resp.json().catch(() => ({}));
+            msgIdIA = respBody?.messages?.[0]?.id || '';
+            if (!resp.ok) {
+              console.error('❌ Error al enviar respuesta IA a WhatsApp:', resp.status, respBody);
+            } else {
+              console.log('✅ Respuesta IA enviada a WhatsApp correctamente');
+            }
           }
         } catch (error) {
           console.error('❌ Error de red al enviar respuesta IA a WhatsApp:', error);
@@ -1563,14 +1629,19 @@ JSON:`;
       }
 
       // Guardar mensaje en la base de datos
+      const contenidoIA = (tipoRespuestaIA === 'imagen')
+        ? (respuestaIA || '📎 [Imagen]')
+        : respuestaIA;
       const mensajeIADb = await Mensaje.create({
         conversacionId: conversacion._id,
         remitente: 'ia',
-        contenido: respuestaIA,
+        contenido: contenidoIA,
+        tipo: tipoRespuestaIA === 'imagen' ? 'imagen' : 'texto',
+        urlArchivo: tipoRespuestaIA === 'imagen' ? urlArchivoIA : '',
         whatsappMsgId: msgIdIA
       });
 
-      await Conversacion.findByIdAndUpdate(conversacion._id, { ultimoMensaje: respuestaIA });
+      await Conversacion.findByIdAndUpdate(conversacion._id, { ultimoMensaje: contenidoIA });
 
       // ===== Guardar pedido automáticamente si ya están todos los datos =====
       try {
@@ -1677,13 +1748,15 @@ JSON:`;
           mensaje: {
             _id: mensajeIADb._id,
             remitente: 'ia',
-            contenido: respuestaIA,
+            contenido: contenidoIA,
+            tipo: tipoRespuestaIA === 'imagen' ? 'imagen' : 'texto',
+            urlArchivo: tipoRespuestaIA === 'imagen' ? urlArchivoIA : '',
             estado: 'enviado',
             fecha: new Date()
           },
           conversacion: {
             _id: conversacion._id,
-            ultimoMensaje: respuestaIA,
+            ultimoMensaje: contenidoIA,
             updatedAt: new Date()
           }
         });
@@ -1914,6 +1987,86 @@ async function enviarMensajeMeta(empresa, telefonoCliente, mensaje) {
     return { ok: true, data, msgId: data?.messages?.[0]?.id || '' };
   } catch (error) {
     return { ok: false, error: error.message || 'Error de red al comunicarse con WhatsApp' };
+  }
+}
+
+// Sube una imagen local a WhatsApp y la envía al cliente.
+// `rutaRelativa` es la ruta guardada en Producto.fotoUrl (ej: /uploads/<empresaId>/foto.jpg).
+async function enviarImagenMeta(empresa, telefonoCliente, rutaRelativa, caption) {
+  const whatsappPhoneId = empresa?.whatsappPhoneId;
+  const accessToken = empresa?.tokenMeta || process.env.WHATSAPP_ACCESS_TOKEN;
+
+  if (!whatsappPhoneId || !telefonoCliente || !accessToken) {
+    return { ok: false, error: 'Faltan datos de empresa, contacto o token para enviar la imagen' };
+  }
+  if (!rutaRelativa) {
+    return { ok: false, error: 'Falta la ruta de la imagen' };
+  }
+
+  const relativa = String(rutaRelativa).replace(/^\//, '');
+  const rutaCompleta = path.join(__dirname, '..', relativa);
+
+  if (!fs.existsSync(rutaCompleta)) {
+    return { ok: false, error: 'Archivo de imagen no encontrado en el servidor' };
+  }
+
+  const ext = path.extname(rutaCompleta).toLowerCase();
+  const mimeMap = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif'
+  };
+  const mimeType = mimeMap[ext] || 'image/jpeg';
+
+  try {
+    const fileBuffer = fs.readFileSync(rutaCompleta);
+
+    const mediaForm = new FormData();
+    mediaForm.append('messaging_product', 'whatsapp');
+    mediaForm.append('type', mimeType);
+    mediaForm.append('file', new Blob([fileBuffer], { type: mimeType }), path.basename(rutaCompleta));
+
+    const respSubida = await breakerMeta.execute(() => fetch(
+      `https://graph.facebook.com/v19.0/${whatsappPhoneId}/media`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: mediaForm
+      }
+    ));
+    const dataSubida = await respSubida.json().catch(() => ({}));
+    if (!respSubida.ok || !dataSubida?.id) {
+      return { ok: false, error: dataSubida?.error?.message || `HTTP ${respSubida.status} al subir la imagen` };
+    }
+
+    const mediaId = dataSubida.id;
+
+    const respEnvio = await breakerMeta.execute(() => fetch(
+      `https://graph.facebook.com/v19.0/${whatsappPhoneId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: telefonoCliente,
+          type: 'image',
+          image: { id: mediaId, caption: caption || '' }
+        })
+      }
+    ));
+    const dataEnvio = await respEnvio.json().catch(() => ({}));
+    if (!respEnvio.ok) {
+      return { ok: false, error: dataEnvio?.error?.message || `HTTP ${respEnvio.status} al enviar la imagen` };
+    }
+
+    return { ok: true, msgId: dataEnvio?.messages?.[0]?.id || '' };
+  } catch (error) {
+    return { ok: false, error: error.message || 'Error de red al enviar la imagen' };
   }
 }
 
