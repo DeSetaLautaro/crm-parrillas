@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Producto = require('../models/Producto');
 
 const TIPOS_ENVIO = ['gratis', 'a_consultar', 'fijo'];
+const MAX_FOTOS = 5;
 
 // Normaliza el bloque de envío: tipo válido y costo 0 salvo que sea fijo.
 function normalizarEnvio(envio) {
@@ -77,6 +78,20 @@ function limpiarExtras(extras) {
   return extras.map(e => String(e).trim()).filter(Boolean);
 }
 
+// Normaliza la lista de fotos de una parrilla (máximo 5).
+// Acepta el array nuevo `fotos` o, como fallback, el `fotoUrl` viejo (una sola).
+function normalizarFotos({ fotos, fotoUrl } = {}) {
+  let lista = [];
+  if (Array.isArray(fotos)) {
+    lista = fotos.map(f => String(f || '').trim()).filter(Boolean);
+  }
+  if (lista.length === 0 && fotoUrl) {
+    const f = String(fotoUrl).trim();
+    if (f) lista = [f];
+  }
+  return lista.slice(0, MAX_FOTOS);
+}
+
 // Lista todos los productos de la empresa del usuario autenticado.
 async function listarProductos(req, res) {
   try {
@@ -119,18 +134,20 @@ async function crearProducto(req, res) {
       return res.status(403).json({ error: 'No se pudo identificar la empresa' });
     }
 
-    const { nombre, precio, fotoUrl, extras, envio, dimensions, fbAdId } = req.body || {};
+    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
       return res.status(400).json({ error: errorValidacion });
     }
 
+    const fotosNormalizadas = normalizarFotos({ fotos, fotoUrl });
     const producto = new Producto({
       empresaId,
       nombre: String(nombre).trim(),
       precio: Number(precio),
-      fotoUrl: String(fotoUrl || ''),
+      fotos: fotosNormalizadas,
+      fotoUrl: fotosNormalizadas[0] || '',
       fbAdId: String(fbAdId || '').trim(),
       extras: limpiarExtras(extras),
       envio: normalizarEnvio(envio),
@@ -160,7 +177,7 @@ async function actualizarProducto(req, res) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
-    const { nombre, precio, fotoUrl, extras, envio, dimensions, fbAdId } = req.body || {};
+    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
@@ -171,7 +188,11 @@ async function actualizarProducto(req, res) {
     // los validadores del schema (por ejemplo el de envio.costo).
     producto.nombre = String(nombre).trim();
     producto.precio = Number(precio);
-    if (fotoUrl !== undefined) producto.fotoUrl = String(fotoUrl || '');
+    if (fotos !== undefined || fotoUrl !== undefined) {
+      const fotosNormalizadas = normalizarFotos({ fotos, fotoUrl });
+      producto.fotos = fotosNormalizadas;
+      producto.fotoUrl = fotosNormalizadas[0] || '';
+    }
     if (fbAdId !== undefined) producto.fbAdId = String(fbAdId || '').trim();
     producto.extras = limpiarExtras(extras);
     producto.envio = normalizarEnvio(envio);
@@ -209,15 +230,16 @@ async function eliminarProducto(req, res) {
 // Sube una foto de producto y devuelve la ruta relativa para guardar en fotoUrl.
 async function subirFotoProducto(req, res) {
   try {
-    if (!req.file) {
+    const archivos = Array.isArray(req.files) ? req.files : (req.file ? [req.file] : []);
+    if (archivos.length === 0) {
       return res.status(400).json({ error: 'No se recibió archivo' });
     }
     const empresaId = req.empresaId;
     if (!empresaId) {
       return res.status(403).json({ error: 'No se pudo identificar la empresa' });
     }
-    const fotoUrl = `/uploads/${empresaId}/${req.file.filename}`;
-    return res.status(201).json({ ok: true, fotoUrl });
+    const fotos = archivos.slice(0, MAX_FOTOS).map(f => `/uploads/${empresaId}/${f.filename}`);
+    return res.status(201).json({ ok: true, fotos, fotoUrl: fotos[0] || '' });
   } catch (error) {
     console.error('Error al subir foto de producto:', error);
     return res.status(500).json({ error: 'Error interno al subir la foto' });

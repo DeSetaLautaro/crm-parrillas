@@ -1475,7 +1475,8 @@ JSON:`;
               if (p.envio?.tipo === 'gratis') partes.push('Envío gratis');
               else if (p.envio?.tipo === 'fijo') partes.push(`Envío $${Number(p.envio.costo || 0).toFixed(2)}`);
               else partes.push('Envío a consultar');
-              partes.push(p.fotoUrl ? 'Con foto' : 'Sin foto');
+              const tieneFotos = (Array.isArray(p.fotos) && p.fotos.length > 0) || p.fotoUrl;
+              partes.push(tieneFotos ? 'Con foto' : 'Sin foto');
               return partes.join(' | ');
             }).join('\n')
           : 'No hay productos cargados en el catálogo.';
@@ -1569,14 +1570,30 @@ JSON:`;
             const productoFoto = productos.find(p => String(p.nombre || '').toLowerCase() === nombreBuscado)
               || productos.find(p => String(p.nombre || '').toLowerCase().includes(nombreBuscado));
 
-            if (productoFoto && productoFoto.fotoUrl) {
-              const resultadoImg = await enviarImagenMeta(empresa, telefonoCliente, productoFoto.fotoUrl, respuestaIA);
-              if (resultadoImg.ok) {
-                msgIdIA = resultadoImg.msgId;
-                urlArchivoIA = productoFoto.fotoUrl;
-                console.log(`✅ Imagen del producto "${productoFoto.nombre}" enviada a WhatsApp`);
+            const fotosProducto = productoFoto
+              ? ((Array.isArray(productoFoto.fotos) && productoFoto.fotos.length > 0)
+                  ? productoFoto.fotos
+                  : (productoFoto.fotoUrl ? [productoFoto.fotoUrl] : []))
+              : [];
+
+            if (productoFoto && fotosProducto.length > 0) {
+              let primeraOk = false;
+              for (let i = 0; i < fotosProducto.length; i++) {
+                const caption = (i === 0) ? respuestaIA : '';
+                const resultadoImg = await enviarImagenMeta(empresa, telefonoCliente, fotosProducto[i], caption);
+                if (resultadoImg.ok) {
+                  if (i === 0) {
+                    msgIdIA = resultadoImg.msgId;
+                    urlArchivoIA = fotosProducto[0];
+                    primeraOk = true;
+                  }
+                } else {
+                  console.error(`❌ Error al enviar imagen ${i + 1}:`, resultadoImg.error);
+                }
+              }
+              if (primeraOk) {
+                console.log(`✅ ${fotosProducto.length} foto(s) del producto "${productoFoto.nombre}" enviada(s) a WhatsApp`);
               } else {
-                console.error('❌ Error al enviar imagen:', resultadoImg.error);
                 // Fallback: mandar el caption como texto (si hay)
                 if (respuestaIA) {
                   const resultadoTexto = await enviarMensajeMeta(empresa, telefonoCliente, respuestaIA);

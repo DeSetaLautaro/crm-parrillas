@@ -115,6 +115,64 @@
     font-size: 0.9rem;
     padding: 20px 0;
   }
+
+  .producto-fotos-grid {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .producto-foto-item {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #E5E7EB;
+    background: #F3F4F6;
+  }
+
+  .producto-foto-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .producto-foto-item.principal::after {
+    content: 'Principal';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(37, 99, 235, 0.85);
+    color: #fff;
+    font-size: 9px;
+    text-align: center;
+    padding: 1px 0;
+    letter-spacing: 0.02em;
+  }
+
+  .producto-foto-quitar {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(220, 38, 38, 0.9);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 </style>
 
 <h2>Mis parrillas</h2>
@@ -133,15 +191,12 @@
         <label class="difusion-label" for="producto-precio">Precio</label>
         <input type="number" id="producto-precio" class="difusion-input" min="0" step="0.01" placeholder="0">
       </div>
-      <div class="difusion-field-group">
-        <label class="difusion-label" for="producto-foto">Foto</label>
-        <input type="text" id="producto-foto" class="difusion-input" placeholder="/uploads/... o https://...">
-        <div style="margin-top:8px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <input type="file" id="producto-foto-archivo" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
-          <button type="button" id="btn-subir-foto-producto" style="padding:8px 14px; border-radius:8px; border:1px solid #D1D5DB; background:#FFFFFF; font-size:0.85rem; font-weight:600; cursor:pointer;">📷 Subir imagen</button>
-          <img id="producto-foto-preview" alt="" style="width:56px; height:56px; object-fit:cover; border-radius:8px; border:1px solid #E5E7EB; display:none;">
-          <span id="producto-foto-estado" style="font-size:12px; color:#6B7280;"></span>
-        </div>
+      <div class="difusion-field-group" style="grid-column: 1 / -1;">
+        <label class="difusion-label">Fotos (hasta 5)</label>
+        <input type="file" id="producto-foto-archivo" accept="image/png,image/jpeg,image/webp,image/gif" multiple style="display:none;">
+        <button type="button" id="btn-subir-foto-producto" style="padding:8px 14px; border-radius:8px; border:1px solid #D1D5DB; background:#FFFFFF; font-size:0.85rem; font-weight:600; cursor:pointer;">📷 Agregar fotos</button>
+        <span id="producto-foto-estado" style="margin-left:10px; font-size:12px; color:#6B7280;"></span>
+        <div id="producto-fotos-grid" class="producto-fotos-grid"></div>
       </div>
       <div class="difusion-field-group">
         <label class="difusion-label" for="producto-extras">Extras (separados por coma)</label>

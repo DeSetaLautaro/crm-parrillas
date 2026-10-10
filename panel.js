@@ -124,6 +124,7 @@ let ventanaAbiertaGlobal = true;
 let PLANTILLAS_META = [];
 let modalPlantillaAbierto = false;
 let PRODUCTOS = [];
+let PRODUCTO_FOTOS = [];
 let EMPRESAS_INFO = [];
 let AGENTES_GLOBAL = [];
 let agenteEditandoId = null;
@@ -5190,7 +5191,7 @@ function actualizarEnvioCostoProducto() {
 
 function limpiarFormularioProducto() {
   const campos = [
-    'producto-id', 'producto-nombre', 'producto-precio', 'producto-foto', 'producto-extras',
+    'producto-id', 'producto-nombre', 'producto-precio', 'producto-extras',
     'producto-fbadid',
     'producto-envio-costo', 'producto-width', 'producto-depth', 'producto-height',
     'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth'
@@ -5210,8 +5211,9 @@ function limpiarFormularioProducto() {
   const btnCancelar = document.getElementById('btn-cancelar-producto');
   if (btnCancelar) btnCancelar.style.display = 'none';
 
+  PRODUCTO_FOTOS = [];
+  renderFotosProducto();
   mostrarErrorProducto('');
-  actualizarPreviewFotoProducto();
 }
 
 function etiquetaEnvioProducto(envio) {
@@ -5233,9 +5235,14 @@ function renderProductos(productos) {
   cont.innerHTML = productos.map(p => {
     const nombre = escaparHTML(p.nombre || '');
     const precio = Number(p.precio || 0).toFixed(2);
-    const foto = p.fotoUrl
-      ? `<img class="producto-foto" src="${urlFotoConToken(p.fotoUrl)}" alt="${nombre}">`
+    const fotosProducto = Array.isArray(p.fotos) && p.fotos.length > 0 ? p.fotos : (p.fotoUrl ? [p.fotoUrl] : []);
+    const fotoPrincipal = fotosProducto[0] || '';
+    const foto = fotoPrincipal
+      ? `<img class="producto-foto" src="${urlFotoConToken(fotoPrincipal)}" alt="${nombre}">`
       : '<div class="producto-foto-vacia">🍖</div>';
+    const badgeCantFotos = fotosProducto.length > 1
+      ? `<span class="producto-extra">📸 ${fotosProducto.length} fotos</span>`
+      : '';
     const medidas = p.dimensions?.displayString
       ? `<span class="producto-extra">${escaparHTML(p.dimensions.displayString)}</span>`
       : '';
@@ -5250,6 +5257,7 @@ function renderProductos(productos) {
           <span class="producto-precio">$${precio}</span>
           ${medidas}
           ${extras}
+          ${badgeCantFotos}
           <span class="producto-extra">${etiquetaEnvioProducto(p.envio)}</span>
         </div>
         <div class="producto-acciones">
@@ -5292,7 +5300,9 @@ function editarProducto(id) {
   set('producto-id', p._id);
   set('producto-nombre', p.nombre || '');
   set('producto-precio', p.precio ?? '');
-  set('producto-foto', p.fotoUrl || '');
+  PRODUCTO_FOTOS = Array.isArray(p.fotos) && p.fotos.length > 0
+    ? [...p.fotos]
+    : (p.fotoUrl ? [p.fotoUrl] : []);
   set('producto-fbadid', p.fbAdId || '');
   set('producto-extras', (p.extras || []).join(', '));
 
@@ -5316,8 +5326,8 @@ function editarProducto(id) {
   const btnCancelar = document.getElementById('btn-cancelar-producto');
   if (btnCancelar) btnCancelar.style.display = 'inline-block';
 
+  renderFotosProducto();
   mostrarErrorProducto('');
-  actualizarPreviewFotoProducto();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -5325,7 +5335,6 @@ async function guardarProducto() {
   const id = obtenerValorProducto('producto-id').trim();
   const nombre = obtenerValorProducto('producto-nombre').trim();
   const precio = parseFloat(obtenerValorProducto('producto-precio'));
-  const fotoUrl = obtenerValorProducto('producto-foto').trim();
   const fbAdId = obtenerValorProducto('producto-fbadid').trim();
   const tipoEnvio = document.querySelector('input[name="producto-envio"]:checked')?.value || 'a_consultar';
   const costoEnvio = parseFloat(obtenerValorProducto('producto-envio-costo')) || 0;
@@ -5349,7 +5358,8 @@ async function guardarProducto() {
   const payload = {
     nombre,
     precio,
-    fotoUrl,
+    fotos: PRODUCTO_FOTOS,
+    fotoUrl: PRODUCTO_FOTOS[0] || '',
     fbAdId,
     extras,
     envio: { tipo: tipoEnvio, costo: tipoEnvio === 'fijo' ? costoEnvio : 0 },
@@ -5431,48 +5441,77 @@ function initProductos() {
     });
   }
 
-  // Subida de foto del producto
+  // Subida de fotos del producto
   const btnSubirFoto = document.getElementById('btn-subir-foto-producto');
   const inputFotoArchivo = document.getElementById('producto-foto-archivo');
   if (btnSubirFoto && inputFotoArchivo) {
-    btnSubirFoto.addEventListener('click', () => inputFotoArchivo.click());
+    btnSubirFoto.addEventListener('click', () => {
+      if (PRODUCTO_FOTOS.length >= 5) {
+        mostrarErrorProducto('Ya cargaste el máximo de 5 fotos');
+        return;
+      }
+      inputFotoArchivo.click();
+    });
     inputFotoArchivo.addEventListener('change', subirFotoProducto);
   }
 
-  // Refrescar la preview si el usuario tipea/pega una URL manualmente
-  const inputFotoTexto = document.getElementById('producto-foto');
-  if (inputFotoTexto) {
-    inputFotoTexto.addEventListener('input', actualizarPreviewFotoProducto);
+  const gridFotos = document.getElementById('producto-fotos-grid');
+  if (gridFotos) {
+    gridFotos.addEventListener('click', (e) => {
+      const btn = e.target.closest('.producto-foto-quitar');
+      if (btn) {
+        quitarFotoProducto(Number(btn.dataset.index));
+      }
+    });
   }
 
   actualizarEnvioCostoProducto();
-  actualizarPreviewFotoProducto();
+  renderFotosProducto();
 }
 
-function actualizarPreviewFotoProducto() {
-  const preview = document.getElementById('producto-foto-preview');
-  if (!preview) return;
-  const valor = obtenerValorProducto('producto-foto').trim();
-  if (!valor) {
-    preview.style.display = 'none';
-    preview.removeAttribute('src');
+function renderFotosProducto() {
+  const grid = document.getElementById('producto-fotos-grid');
+  if (!grid) return;
+  if (PRODUCTO_FOTOS.length === 0) {
+    grid.innerHTML = '<span style="font-size:12px; color:#9CA3AF;">Sin fotos cargadas</span>';
     return;
   }
-  preview.onerror = () => { preview.style.display = 'none'; };
-  preview.src = urlFotoConToken(valor);
-  preview.style.display = 'block';
+  grid.innerHTML = PRODUCTO_FOTOS.map((url, i) => `
+    <div class="producto-foto-item ${i === 0 ? 'principal' : ''}">
+      <img src="${urlFotoConToken(url)}" alt="Foto ${i + 1}" onerror="this.style.opacity=0.3">
+      <button type="button" class="producto-foto-quitar" data-index="${i}" title="Quitar foto">×</button>
+    </div>
+  `).join('');
+}
+
+function quitarFotoProducto(index) {
+  if (index < 0 || index >= PRODUCTO_FOTOS.length) return;
+  PRODUCTO_FOTOS.splice(index, 1);
+  renderFotosProducto();
 }
 
 async function subirFotoProducto(e) {
-  const file = e.target.files && e.target.files[0];
-  if (!file) return;
+  const archivos = Array.from(e.target.files || []);
+  if (archivos.length === 0) return;
+
+  const disponibles = 5 - PRODUCTO_FOTOS.length;
+  if (disponibles <= 0) {
+    mostrarErrorProducto('Ya cargaste el máximo de 5 fotos');
+    e.target.value = '';
+    return;
+  }
+  const aSubir = archivos.slice(0, disponibles);
+  if (archivos.length > disponibles) {
+    mostrarErrorProducto(`Solo se subieron ${disponibles} foto(s): el máximo es 5`);
+  } else {
+    mostrarErrorProducto('');
+  }
 
   const estado = document.getElementById('producto-foto-estado');
   if (estado) estado.textContent = 'Subiendo...';
-  mostrarErrorProducto('');
 
   const formData = new FormData();
-  formData.append('foto', file);
+  aSubir.forEach(f => formData.append('foto', f));
 
   const token = localStorage.getItem('token') || '';
   try {
@@ -5483,18 +5522,18 @@ async function subirFotoProducto(e) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      mostrarErrorProducto(data.error || 'No se pudo subir la imagen');
+      mostrarErrorProducto(data.error || 'No se pudieron subir las fotos');
       if (estado) estado.textContent = '';
       return;
     }
-    const inputFoto = document.getElementById('producto-foto');
-    if (inputFoto) inputFoto.value = data.fotoUrl || '';
-    actualizarPreviewFotoProducto();
-    if (estado) estado.textContent = 'Imagen subida ✓';
+    const nuevas = Array.isArray(data.fotos) ? data.fotos : (data.fotoUrl ? [data.fotoUrl] : []);
+    PRODUCTO_FOTOS = PRODUCTO_FOTOS.concat(nuevas).slice(0, 5);
+    renderFotosProducto();
+    if (estado) estado.textContent = nuevas.length > 1 ? `${nuevas.length} fotos subidas ✓` : 'Foto subida ✓';
     setTimeout(() => { if (estado) estado.textContent = ''; }, 2000);
   } catch (error) {
-    console.error('Error al subir foto del producto:', error);
-    mostrarErrorProducto('Error de red al subir la imagen');
+    console.error('Error al subir fotos del producto:', error);
+    mostrarErrorProducto('Error de red al subir las fotos');
     if (estado) estado.textContent = '';
   } finally {
     e.target.value = '';

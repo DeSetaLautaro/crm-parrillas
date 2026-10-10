@@ -22,6 +22,11 @@ const ProductoSchema = new Schema(
       type: String,
       default: ''
     },
+    // Galería de fotos de la parrilla (hasta 5). `fotoUrl` refleja la primera.
+    fotos: {
+      type: [String],
+      default: []
+    },
     fbAdId: {
       type: String,
       default: '',

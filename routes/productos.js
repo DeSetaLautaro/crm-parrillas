@@ -60,9 +60,9 @@ function asegurarEmpresa(req, res, next) {
   next();
 }
 
-// Subir foto de producto. Devuelve la ruta relativa para guardar en fotoUrl.
+// Subir fotos de un producto (hasta 5). Devuelve las rutas relativas.
 // Va antes de las rutas con :id para que /subir-foto no matchee con /:id.
-router.post('/subir-foto', auth, asegurarEmpresa, upload.single('foto'), subirFotoProducto);
+router.post('/subir-foto', auth, asegurarEmpresa, upload.array('foto', 5), subirFotoProducto);
 
 // Todas las rutas exigen JWT y filtran por la empresa del usuario
 router.get('/', auth, listarProductos);
