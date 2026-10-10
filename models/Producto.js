@@ -58,9 +58,10 @@ const ProductoSchema = new Schema(
       diametroCm: Number,
       emparrilladoWidthCm: Number,
       emparrilladoDepthCm: Number,
+      // Generado automáticamente en el backend a partir de los números de arriba.
       displayString: {
         type: String,
-        required: true
+        default: ''
       }
     }
   },

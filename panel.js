@@ -5062,8 +5062,7 @@ function limpiarFormularioProducto() {
     'producto-id', 'producto-nombre', 'producto-precio', 'producto-foto', 'producto-extras',
     'producto-fbadid',
     'producto-envio-costo', 'producto-width', 'producto-depth', 'producto-height',
-    'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth',
-    'producto-display'
+    'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth'
   ];
   campos.forEach(id => {
     const el = document.getElementById(id);
@@ -5179,7 +5178,6 @@ function editarProducto(id) {
   set('producto-diametro', d.diametroCm ?? '');
   set('producto-emparrillado-width', d.emparrilladoWidthCm ?? '');
   set('producto-emparrillado-depth', d.emparrilladoDepthCm ?? '');
-  set('producto-display', d.displayString || '');
 
   const titulo = document.getElementById('producto-form-titulo');
   if (titulo) titulo.textContent = 'Editar parrilla';
@@ -5198,7 +5196,6 @@ async function guardarProducto() {
   const precio = parseFloat(obtenerValorProducto('producto-precio'));
   const fotoUrl = obtenerValorProducto('producto-foto').trim();
   const fbAdId = obtenerValorProducto('producto-fbadid').trim();
-  const displayString = obtenerValorProducto('producto-display').trim();
   const tipoEnvio = document.querySelector('input[name="producto-envio"]:checked')?.value || 'a_consultar';
   const costoEnvio = parseFloat(obtenerValorProducto('producto-envio-costo')) || 0;
   const extras = obtenerValorProducto('producto-extras')
@@ -5211,7 +5208,6 @@ async function guardarProducto() {
   if (tipoEnvio === 'fijo' && costoEnvio <= 0) {
     return mostrarErrorProducto('Si el envío es fijo, poné un costo mayor a 0');
   }
-  if (!displayString) return mostrarErrorProducto('Completá el texto de medidas');
 
   const numeroOpcional = (idCampo) => {
     const v = obtenerValorProducto(idCampo);
@@ -5232,8 +5228,7 @@ async function guardarProducto() {
       heightCm: numeroOpcional('producto-height'),
       diametroCm: numeroOpcional('producto-diametro'),
       emparrilladoWidthCm: numeroOpcional('producto-emparrillado-width'),
-      emparrilladoDepthCm: numeroOpcional('producto-emparrillado-depth'),
-      displayString
+      emparrilladoDepthCm: numeroOpcional('producto-emparrillado-depth')
     }
   };
 

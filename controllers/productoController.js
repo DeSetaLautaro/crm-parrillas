@@ -10,7 +10,34 @@ function normalizarEnvio(envio) {
   return { tipo, costo: Number(envio.costo) || 0 };
 }
 
+// Genera el texto de medidas que ve el cliente, a partir de los números cargados.
+// Formato: "60x40 y 80 de alto, emparrillado 50x35"
+function generarDisplayString(d) {
+  const partes = [];
+
+  if (Number.isFinite(d.widthCm) && Number.isFinite(d.depthCm)) {
+    let base = `${d.widthCm}x${d.depthCm}`;
+    if (Number.isFinite(d.heightCm)) base += ` y ${d.heightCm} de alto`;
+    partes.push(base);
+  } else if (Number.isFinite(d.heightCm)) {
+    partes.push(`${d.heightCm} de alto`);
+  } else if (Number.isFinite(d.widthCm)) {
+    partes.push(`${d.widthCm} de ancho`);
+  } else if (Number.isFinite(d.depthCm)) {
+    partes.push(`${d.depthCm} de profundidad`);
+  } else if (Number.isFinite(d.diametroCm)) {
+    partes.push(`Ø ${d.diametroCm}`);
+  }
+
+  if (Number.isFinite(d.emparrilladoWidthCm) && Number.isFinite(d.emparrilladoDepthCm)) {
+    partes.push(`emparrillado ${d.emparrilladoWidthCm}x${d.emparrilladoDepthCm}`);
+  }
+
+  return partes.join(', ');
+}
+
 // Convierte a número los campos de medidas, dejando undefined los que vienen vacíos.
+// El displayString se calcula acá y nunca se toma del body.
 function normalizarDimensiones(dimensions) {
   const d = dimensions || {};
   const numero = (valor) => {
@@ -18,15 +45,16 @@ function normalizarDimensiones(dimensions) {
     const n = Number(valor);
     return Number.isNaN(n) ? undefined : n;
   };
-  return {
+  const normalizado = {
     widthCm: numero(d.widthCm),
     depthCm: numero(d.depthCm),
     heightCm: numero(d.heightCm),
     diametroCm: numero(d.diametroCm),
     emparrilladoWidthCm: numero(d.emparrilladoWidthCm),
-    emparrilladoDepthCm: numero(d.emparrilladoDepthCm),
-    displayString: String(d.displayString || '').trim()
+    emparrilladoDepthCm: numero(d.emparrilladoDepthCm)
   };
+  normalizado.displayString = generarDisplayString(normalizado);
+  return normalizado;
 }
 
 // Devuelve un mensaje de error o null si los datos están bien.
@@ -37,9 +65,6 @@ function validarProducto(datos) {
   const precio = Number(datos.precio);
   if (Number.isNaN(precio) || precio < 0) {
     return 'El precio no es válido';
-  }
-  if (!datos.dimensions || !String(datos.dimensions.displayString || '').trim()) {
-    return 'El texto de medidas (displayString) es obligatorio';
   }
   if (datos.envio && datos.envio.tipo === 'fijo' && !(Number(datos.envio.costo) > 0)) {
     return 'Si el envío es fijo, el costo debe ser mayor a 0';
