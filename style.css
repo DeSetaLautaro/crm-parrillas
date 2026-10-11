@@ -18,7 +18,11 @@ body {
 #app {
   display: flex;
   width: 100vw;
+  /* En mobile, 100vh incluye la barra del navegador, así que el footer/input
+     queda debajo del área visible. 100dvh respeta el viewport real.
+     Si el navegador no lo soporta, se queda con el 100vh de arriba. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -366,6 +370,7 @@ body {
 
 .area-mensajes {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px 24px;
   background: #F9FAFB;
