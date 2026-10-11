@@ -186,6 +186,101 @@ const PROMPT_DEFAULT = `- SIEMPRE pedí la dirección de entrega completa antes 
 - Si el local está CERRADO, avisá de forma amable y aclarás que los pedidos se toman cuando abra.
 - IMPORTANTE: Si el carrito ya tiene items y tenés la dirección, confirmá el pedido, informá el total y preguntá cómo quiere pagar. No esperes a que el cliente diga "confirmo".`;
 
+// ===== Navegación con el botón "atrás" del celular =====
+// Cada "capa" (chat abierto, panel derecho, modal, vista) empuja una entrada al
+// historial. Al tocar atrás, el navegador dispara popstate y cerramos la capa superior.
+const CAPAS_NAVEGACION = [];
+let vistaActualCRM = 'inbox';
+
+// Empuja una capa. Si ya hay una del mismo tipo arriba, solo actualiza su cierre
+// (evita acumular entradas cuando se salta de un chat a otro, por ejemplo).
+function empujarCapa(tipo, cerrar) {
+  if (!tipo || typeof cerrar !== 'function') return;
+  const tope = CAPAS_NAVEGACION[CAPAS_NAVEGACION.length - 1];
+  if (tope && tope.tipo === tipo) {
+    tope.cerrar = cerrar;
+    return;
+  }
+  CAPAS_NAVEGACION.push({ tipo, cerrar });
+  try {
+    history.pushState({ crmCapa: tipo }, '');
+  } catch (_) {
+    // Navegador sin soporte: seguimos sin esa entrada de historial
+  }
+}
+
+// Cierra la capa superior si coincide con el tipo pedido.
+// Devuelve true si se encargó (y ya retrocedió en el historial).
+function cerrarCapaDeTipo(tipo) {
+  const tope = CAPAS_NAVEGACION[CAPAS_NAVEGACION.length - 1];
+  if (!tope || tope.tipo !== tipo) return false;
+  try {
+    history.back();
+  } catch (_) {
+    const capa = CAPAS_NAVEGACION.pop();
+    if (capa && typeof capa.cerrar === 'function') capa.cerrar();
+  }
+  return true;
+}
+
+function cerrarChatCapa() {
+  chatActivoId = null;
+  renderTodo();
+}
+
+function cerrarPanelDerecho() {
+  const app = document.getElementById('app');
+  if (app) app.classList.remove('perfil-abierto');
+  const modal = document.getElementById('modal-detalles');
+  if (modal) modal.classList.add('hidden');
+}
+
+function cerrarNuevoContactoModal() {
+  const modal = document.getElementById('modal-nuevo-contacto');
+  if (modal) modal.classList.add('hidden');
+}
+
+function cerrarModalPlantilla() {
+  const modal = document.getElementById('modal-plantilla-ventana');
+  if (modal) modal.classList.add('hidden');
+}
+
+// Abre un chat desde la lista (o desde una notificación). En mobile deja una capa
+// en el historial para que el botón atrás vuelva a la lista de chats.
+function abrirChatDesdeLista(convId) {
+  const cambio = chatActivoId !== convId;
+  chatActivoId = convId;
+  marcarMensajesLeidos();
+  if (cambio && window.innerWidth <= 768) {
+    empujarCapa('chat', cerrarChatCapa);
+  }
+  renderTodo();
+}
+
+// Cambia de vista dejando una capa en el historial (salvo para "inbox"),
+// así el botón atrás vuelve a la vista anterior.
+function irAVista(vista) {
+  if (vista === vistaActualCRM) return;
+  const anterior = vistaActualCRM;
+  vistaActualCRM = vista;
+  showView(vista);
+  if (vista !== 'inbox') {
+    empujarCapa('vista', () => {
+      vistaActualCRM = anterior;
+      showView(anterior);
+    });
+  }
+}
+
+// El botón atrás del navegador va cerrando las capas del CRM en orden.
+window.addEventListener('popstate', () => {
+  const capa = CAPAS_NAVEGACION.pop();
+  if (capa && typeof capa.cerrar === 'function') {
+    capa.cerrar();
+  }
+  // Si no había capas, no hacemos nada: el navegador sigue su navegación normal.
+});
+
 // ===== Helpers =====
 function escaparHTML(texto) {
   const div = document.createElement('div');
@@ -355,9 +450,7 @@ function notificarMensajeNuevo(payload) {
     notificacion.onclick = () => {
       window.focus();
       if (conversacionId) {
-        chatActivoId = conversacionId;
-        renderTodo();
-        marcarMensajesLeidos();
+        abrirChatDesdeLista(conversacionId);
       }
       notificacion.close();
     };
@@ -630,9 +723,7 @@ function renderListaChats() {
     document.querySelectorAll('.chat-item').forEach(item => {
       item.addEventListener('click', (e) => {
         if (e.target.closest('.chat-item-accion') || e.target.closest('.chat-chip-etiqueta')) return;
-        chatActivoId = item.dataset.convId;
-        marcarMensajesLeidos();
-        renderTodo();
+        abrirChatDesdeLista(item.dataset.convId);
       });
     });
 
@@ -651,9 +742,7 @@ function renderListaChats() {
   document.querySelectorAll('.chat-item').forEach(item => {
     item.addEventListener('click', (e) => {
       if (e.target.closest('.chat-item-accion') || e.target.closest('.chat-chip-etiqueta')) return;
-      chatActivoId = item.dataset.convId;
-      marcarMensajesLeidos();
-      renderTodo();
+      abrirChatDesdeLista(item.dataset.convId);
     });
   });
 }
@@ -760,8 +849,9 @@ function armarBotonCerrarPerfilMovil() {
   btn.textContent = '←';
   btn.title = 'Volver al chat';
   btn.addEventListener('click', () => {
-    document.getElementById('app').classList.remove('perfil-abierto');
-    document.getElementById('modal-detalles')?.classList.add('hidden');
+    if (!cerrarCapaDeTipo('panel-derecho')) {
+      cerrarPanelDerecho();
+    }
   });
   perfilHeader.insertBefore(btn, perfilHeader.firstChild);
 }
@@ -782,6 +872,8 @@ function abrirArchivosNotasDesdeMenu() {
   const panelArchivos = document.getElementById('archivos-panel');
   if (panelNotas) panelNotas.classList.remove('hidden');
   if (panelArchivos) panelArchivos.classList.add('hidden');
+
+  empujarCapa('panel-derecho', cerrarPanelDerecho);
 }
 
 function renderChatActivo() {
@@ -1509,6 +1601,7 @@ async function abrirModalPlantillaChat() {
   }
 
   modal.classList.remove('hidden');
+  empujarCapa('modal-plantilla', cerrarModalPlantilla);
 }
 
 function actualizarVariablesPlantillaChat() {
@@ -1575,7 +1668,9 @@ async function enviarPlantillaDesdeChat() {
     }
     const conv = getConversacionPorId(chatActivoId);
     if (conv) conv.ventanaAbierta = true;
-    document.getElementById('modal-plantilla-ventana').classList.add('hidden');
+    if (!cerrarCapaDeTipo('modal-plantilla')) {
+      cerrarModalPlantilla();
+    }
     await cargarConversaciones();
     mostrarToast('Plantilla enviada correctamente', 'info');
   } catch (error) {
@@ -3665,8 +3760,9 @@ async function guardarNuevoContacto() {
       return;
     }
 
-    const modal = document.getElementById('modal-nuevo-contacto');
-    if (modal) modal.classList.add('hidden');
+    if (!cerrarCapaDeTipo('modal-nuevo-contacto')) {
+      cerrarNuevoContactoModal();
+    }
     ['nuevo-contacto-nombre','nuevo-contacto-telefono','nuevo-contacto-direccion','nuevo-contacto-etiquetas'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -3780,6 +3876,7 @@ function abrirDetallesModal() {
   if (menu) menu.classList.add('hidden');
   const modal = document.getElementById('modal-detalles');
   if (modal) modal.classList.remove('hidden');
+  empujarCapa('panel-derecho', cerrarPanelDerecho);
 }
 
 function cerrarDetallesModal() {
@@ -3834,7 +3931,9 @@ async function guardarDetallesDesdeModal() {
 
     // Actualizar la lista de chats y el encabezado del chat con el nuevo nombre
     renderTodo();
-    cerrarDetallesModal();
+    if (!cerrarCapaDeTipo('panel-derecho')) {
+      cerrarDetallesModal();
+    }
   } catch (error) {
     console.error('Error de red al guardar detalles:', error);
   }
@@ -4475,28 +4574,29 @@ async function init() {
   });
 
   // Sidebar: alternar entre Inbox, Configuración y Perfil
-  document.getElementById('btn-inbox').addEventListener('click', () => showView('inbox'));
-  document.getElementById('btn-config').addEventListener('click', () => showView('config'));
+  // Usamos irAVista para que el botón "atrás" del celular vuelva a la vista anterior.
+  document.getElementById('btn-inbox').addEventListener('click', () => irAVista('inbox'));
+  document.getElementById('btn-config').addEventListener('click', () => irAVista('config'));
   const btnPerfil = document.getElementById('btn-perfil');
   if (btnPerfil) {
     btnPerfil.addEventListener('click', () => {
-      showView('perfil');
+      irAVista('perfil');
     });
   }
 
   const btnPagos = document.getElementById('btn-pagos');
   if (btnPagos) {
-    btnPagos.addEventListener('click', () => showView('pagos'));
+    btnPagos.addEventListener('click', () => irAVista('pagos'));
   }
 
   const btnDifusion = document.getElementById('btn-difusion');
   if (btnDifusion) {
-    btnDifusion.addEventListener('click', () => showView('difusion'));
+    btnDifusion.addEventListener('click', () => irAVista('difusion'));
   }
 
   const btnProductos = document.getElementById('btn-productos');
   if (btnProductos) {
-    btnProductos.addEventListener('click', () => showView('productos'));
+    btnProductos.addEventListener('click', () => irAVista('productos'));
   }
 
   const btnCrearDifusion = document.getElementById('btn-crear-difusion');
@@ -4751,13 +4851,16 @@ async function init() {
   if (btnNuevoContacto && modalNuevoContacto) {
     btnNuevoContacto.addEventListener('click', () => {
       modalNuevoContacto.classList.remove('hidden');
+      empujarCapa('modal-nuevo-contacto', cerrarNuevoContactoModal);
     });
   }
 
   const btnCerrarNuevoContacto = document.getElementById('btn-cerrar-nuevo-contacto');
   if (btnCerrarNuevoContacto && modalNuevoContacto) {
     btnCerrarNuevoContacto.addEventListener('click', () => {
-      modalNuevoContacto.classList.add('hidden');
+      if (!cerrarCapaDeTipo('modal-nuevo-contacto')) {
+        cerrarNuevoContactoModal();
+      }
     });
   }
 
@@ -4872,7 +4975,13 @@ async function init() {
   const btnDetalles = document.getElementById('btn-detalles-modal');
   if (btnDetalles) btnDetalles.addEventListener('click', abrirDetallesModal);
   const btnCerrar = document.getElementById('btn-cerrar-detalles');
-  if (btnCerrar) btnCerrar.addEventListener('click', cerrarDetallesModal);
+  if (btnCerrar) {
+    btnCerrar.addEventListener('click', () => {
+      if (!cerrarCapaDeTipo('panel-derecho')) {
+        cerrarDetallesModal();
+      }
+    });
+  }
   const btnGuardarModal = document.getElementById('modal-guardar-detalles');
   if (btnGuardarModal) btnGuardarModal.addEventListener('click', guardarDetallesDesdeModal);
 
@@ -4958,8 +5067,10 @@ async function init() {
     backBtn.textContent = '←';
     backBtn.title = 'Volver a la lista';
     backBtn.addEventListener('click', () => {
-      chatActivoId = null;
-      renderTodo();
+      if (!cerrarCapaDeTipo('chat')) {
+        chatActivoId = null;
+        renderTodo();
+      }
     });
     chatHeader.insertBefore(backBtn, chatHeader.firstChild);
   }
@@ -4975,8 +5086,9 @@ async function init() {
   const btnCancelarPlantilla = document.getElementById('plantilla-cancelar-chat');
   if (btnCancelarPlantilla) {
     btnCancelarPlantilla.addEventListener('click', () => {
-      const modal = document.getElementById('modal-plantilla-ventana');
-      if (modal) modal.classList.add('hidden');
+      if (!cerrarCapaDeTipo('modal-plantilla')) {
+        cerrarModalPlantilla();
+      }
     });
   }
   const btnEnviarPlantilla = document.getElementById('plantilla-enviar-chat');
