@@ -1565,22 +1565,6 @@ JSON:`;
       }
     }
 
-    // ===== Pre-chequeo de stock ANTES de enviar la respuesta =====
-    // Si el carrito tiene items y a alguno le falta stock, corregimos el mensaje
-    // y bloqueamos el guardado automático del pedido.
-    let stockInsuficiente = false;
-    if (botHabilitado && Array.isArray(conversacion.carrito) && conversacion.carrito.length > 0) {
-      const chequeo = await verificarStockCarrito(conversacion.carrito, empresa._id);
-      if (!chequeo.ok) {
-        stockInsuficiente = true;
-        const nombres = chequeo.faltantes.map(f => f.nombre).join(', ');
-        respuestaIA = `Uy, justo se agotó: ${nombres}. ¿Querés elegir otra cosa?`;
-        tipoRespuestaIA = 'texto';
-        productoFotoIA = null;
-        urlArchivoIA = '';
-      }
-    }
-
     // Parsear salida estructurada del modelo (texto o imagen)
     let tipoRespuestaIA = 'texto';
     let productoFotoIA = null;
