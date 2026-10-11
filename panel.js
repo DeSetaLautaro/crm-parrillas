@@ -473,6 +473,7 @@ function filtrarPorMensaje(conversaciones, texto) {
 }
 
 function requiereAtencionHumana(conv) {
+  if (conv.requiereAtencion === true) return true;
   if (conv.botActivo) return false;
   const msgs = getMensajesDeConversacion(conv._id);
   if (msgs.length === 0) return true;
@@ -2939,6 +2940,7 @@ async function cargarConversaciones() {
         ultimaFecha: conv.updatedAt ? new Date(conv.updatedAt) : new Date(),
         cancelacionReciente: conv.tieneCancelacionReciente === true,
         ventanaAbierta: conv.ventanaAbierta !== false,
+        requiereAtencion: conv.requiereAtencion === true,
         tieneMas: conv.mensajes && conv.mensajes.length === 50,
         carrito: conv.carrito || [],
         carritoTotal: conv.carritoTotal || 0
@@ -3399,6 +3401,14 @@ function setupSocketListeners() {
     if (!conv.botActivo) {
       reproducirSonidoNotificacion();
     }
+    renderListaChats();
+  });
+
+  socket.on('atencion-actualizada', (payload) => {
+    if (!payload || !payload.conversacionId) return;
+    const conv = CONVERSACIONES.find(c => c._id === payload.conversacionId);
+    if (!conv) return;
+    conv.requiereAtencion = payload.requiereAtencion === true;
     renderListaChats();
   });
 

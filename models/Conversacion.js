@@ -77,6 +77,11 @@ const ConversacionSchema = new Schema(
     bienvenidaPublicidadEnviada: {
       type: Boolean,
       default: false
+    },
+    // Marca si el bot derivó a un humano (ej: le preguntaron algo que no supo responder)
+    requiereAtencion: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

@@ -80,17 +80,24 @@ CÓMO RESPONDER:
 5. Confirmá el pedido SOLO cuando el cliente ya dio la dirección y muestra intención clara de comprar.
 6. Si el cliente pide explícitamente ver la FOTO de un producto del catálogo, y ese producto figura con "Con foto", mandá la foto (ver formato abajo). No ofrezcas fotos de productos que figuran "Sin foto".
 7. Si un producto figura AGOTADO en el catálogo, no lo ofrezcas ni lo sumes al carrito. Si el cliente lo pide, avisale que ya no hay disponible.
+8. Si el cliente pide algo que no podés resolver con el catálogo, las reglas o los atajos, respondé "eso lo consulto con el local" y marcá "derivar": true en el JSON (ver formato abajo).
 
 FORMATO DE RESPUESTA (MUY IMPORTANTE):
 Respondé SIEMPRE con un objeto JSON válido, sin markdown, sin bloques de código y sin texto extra. Usá uno de estos dos formatos exactos:
 
 • Para respuestas de texto:
-{"tipo": "texto", "respuesta": "tu mensaje para el cliente"}
+{"tipo": "texto", "respuesta": "tu mensaje para el cliente", "derivar": false}
 
 • Para enviar la foto de un producto:
 {"tipo": "imagen", "producto": "nombre exacto del producto tal como figura en el catálogo", "caption": "texto breve que acompañará la foto"}
 
-El campo "respuesta" o "caption" debe ser el mensaje final listo para enviar por WhatsApp. No agregues nada fuera del JSON.`;
+El campo "respuesta" o "caption" debe ser el mensaje final listo para enviar por WhatsApp.
+
+El campo "derivar" es OPCIONAL y solo aplica a las respuestas de texto:
+- Poné "derivar": true cuando el cliente pida algo que no podés resolver con el catálogo, las reglas o los atajos, y tu respuesta sea del tipo "eso lo consulto con el local".
+- En cualquier otro caso, omitilo o poné "derivar": false.
+
+No agregues nada fuera del JSON.`;
 
 const PROMPT_IA_DEFAULT_REGLAS = `- SIEMPRE pedí la dirección de entrega completa antes de confirmar un pedido. No confirmes sin dirección.
 - Preguntá cómo quiere pagar (efectivo o transferencia) antes de cerrar el pedido.
@@ -1569,6 +1576,7 @@ JSON:`;
     let tipoRespuestaIA = 'texto';
     let productoFotoIA = null;
     let urlArchivoIA = '';
+    let derivarIA = false;
     if (respuestaIA) {
       const raw = String(respuestaIA).trim().replace(/```json/gi, '').replace(/```/g, '').trim();
       if (raw.startsWith('{') && raw.endsWith('}')) {
@@ -1581,6 +1589,7 @@ JSON:`;
               respuestaIA = (typeof parsed.caption === 'string') ? parsed.caption.trim() : '';
             } else if (parsed.tipo === 'texto' && typeof parsed.respuesta === 'string') {
               respuestaIA = parsed.respuesta.trim();
+              if (parsed.derivar === true) derivarIA = true;
             }
           }
         } catch (_) {
@@ -1602,6 +1611,23 @@ JSON:`;
         tipoRespuestaIA = 'texto';
         productoFotoIA = null;
         urlArchivoIA = '';
+      }
+    }
+
+    // ===== Derivación a humano pedida por la IA (no supo responder) =====
+    // El bot sigue activo para no dejar al cliente colgado, pero el chat
+    // queda marcado como "requiere atención" en el panel del operador.
+    if (botHabilitado && !stockInsuficiente && derivarIA) {
+      await Conversacion.findByIdAndUpdate(conversacion._id, {
+        $set: { requiereAtencion: true }
+      });
+      conversacion.requiereAtencion = true;
+      const ioAtencion = req.app.get('io');
+      if (ioAtencion) {
+        ioAtencion.to(empresa._id.toString()).emit('atencion-actualizada', {
+          conversacionId: conversacion._id,
+          requiereAtencion: true
+        });
       }
     }
 
@@ -2286,10 +2312,16 @@ const enviarMensaje = async (req, res) => {
       whatsappMsgId: respuestaWhatsApp?.messages?.[0]?.id || ''
     });
 
-    await Conversacion.findByIdAndUpdate(conversacion._id, { ultimoMensaje: mensaje, estado: 'Abierto' });
+    await Conversacion.findByIdAndUpdate(conversacion._id, {
+      $set: { ultimoMensaje: mensaje, estado: 'Abierto', requiereAtencion: false }
+    });
 
     const io = req.app.get('io');
     if (io) {
+      io.to(empresaIdStr).emit('atencion-actualizada', {
+        conversacionId: conversacion._id,
+        requiereAtencion: false
+      });
       io.to(empresaIdStr).emit('mensaje-nuevo', {
         conversacionId: conversacion._id,
         mensaje: {
@@ -2381,7 +2413,10 @@ const actualizarBotActivoConversacion = async (req, res) => {
       return res.status(403).json({ error: 'No tienes acceso a esta conversación' });
     }
 
-    await Conversacion.findByIdAndUpdate(id, { $set: { botActivo } });
+    const actualizacionBot = { botActivo };
+    // Si el operador reactiva el bot, la conversación ya no requiere atención
+    if (botActivo) actualizacionBot.requiereAtencion = false;
+    await Conversacion.findByIdAndUpdate(id, { $set: actualizacionBot });
 
     await registrarAuditoria(req, empresaIdStr, 'cambio_bot_conversacion', `Bot de la conversación ${id} ${botActivo ? 'activado' : 'desactivado'}`, { conversacionId: id, botActivo });
 
@@ -2389,6 +2424,9 @@ const actualizarBotActivoConversacion = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.to(empresaIdStr).emit('bot-actualizado', { conversacionId: id, botActivo });
+      if (botActivo) {
+        io.to(empresaIdStr).emit('atencion-actualizada', { conversacionId: id, requiereAtencion: false });
+      }
     }
 
     return res.json({ ok: true, botActivo });
