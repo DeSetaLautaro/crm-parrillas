@@ -871,7 +871,9 @@ function renderChatActivo() {
 
     const contenidoSeguro = escaparHTML(msg.contenido || '').replace(/\n/g, '<br>');
     let contenidoFinal = contenidoSeguro;
-    if (msg.tipo === 'imagen' && msg.urlArchivo) {
+    if (msg.tipo === 'sticker' && msg.urlArchivo) {
+      contenidoFinal = `<img src="${urlFotoConToken(msg.urlArchivo)}" alt="Sticker" style="max-width:120px; display:block; margin-bottom:4px;">`;
+    } else if (msg.tipo === 'imagen' && msg.urlArchivo) {
       contenidoFinal = `<img src="${urlFotoConToken(msg.urlArchivo)}" alt="Imagen" style="max-width:220px; border-radius:8px; display:block; margin-bottom:4px; cursor:pointer;" onclick="window.open('${urlFotoConToken(msg.urlArchivo)}','_blank')">`;
     } else if (msg.tipo === 'audio' && msg.urlArchivo) {
       const duracionSeg = msg.duracionSegundos
@@ -896,7 +898,7 @@ function renderChatActivo() {
         indicador = `<span class="mensaje-estado" title="${titulo}" style="font-size:13px; font-weight:bold; color:${color}; margin-left:6px; line-height:1;">${simbolo}</span>`;
       }
     }
-    const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo);
+    const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video' || msg.tipo === 'sticker') && msg.urlArchivo);
     const estiloMedia = esMedia ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
     const horaTexto = formatearHoraCorta(fechaMsg);
     const colorHora = (esCliente || esMedia) ? '#6b7280' : 'rgba(255,255,255,0.85)';
@@ -3054,7 +3056,9 @@ async function cargarMasMensajes() {
 
       const contenidoSeguro = escaparHTML(msg.contenido || '').replace(/\n/g, '<br>');
       let contenidoFinal = contenidoSeguro;
-      if (msg.tipo === 'imagen' && msg.urlArchivo) {
+      if (msg.tipo === 'sticker' && msg.urlArchivo) {
+        contenidoFinal = `<img src="${urlFotoConToken(msg.urlArchivo)}" alt="Sticker" style="max-width:120px; display:block; margin-bottom:4px;">`;
+      } else if (msg.tipo === 'imagen' && msg.urlArchivo) {
         contenidoFinal = `<img src="${urlFotoConToken(msg.urlArchivo)}" alt="Imagen" style="max-width:220px; border-radius:8px; display:block; margin-bottom:4px; cursor:pointer;" onclick="window.open('${urlFotoConToken(msg.urlArchivo)}','_blank')">`;
       } else if (msg.tipo === 'audio' && msg.urlArchivo) {
         contenidoFinal = `<audio controls preload="metadata" data-audio-url="${urlFotoConToken(msg.urlArchivo)}" src="${urlFotoConToken(msg.urlArchivo)}" style="max-width:220px; display:block; margin-bottom:4px;"></audio>`;
@@ -3076,7 +3080,7 @@ async function cargarMasMensajes() {
           indicador = `<span class="mensaje-estado" title="${titulo}" style="font-size:13px; font-weight:bold; color:${color}; margin-left:6px; line-height:1;">${simbolo}</span>`;
         }
       }
-      const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video') && msg.urlArchivo);
+      const esMedia = ((msg.tipo === 'imagen' || msg.tipo === 'audio' || msg.tipo === 'video' || msg.tipo === 'sticker') && msg.urlArchivo);
       const estiloMedia = esMedia ? ' style="background:transparent; padding:0; box-shadow:none; border:none;"' : '';
       const horaTexto = formatearHoraCorta(fechaMsg);
       const colorHora = (esCliente || esMedia) ? '#6b7280' : 'rgba(255,255,255,0.85)';

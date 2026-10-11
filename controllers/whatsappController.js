@@ -933,7 +933,7 @@ const recibirMensaje = async (req, res) => {
 
       // Si la empresa activó el procesamiento de audios, intentamos transcribirlo con Gemini
       // Pero SIEMPRE descargamos y guardamos el audio para que el operador lo escuche en el panel
-      const mediaIdMultimedia = mensaje.audio?.id || mensaje.voice?.id || mensaje.image?.id || mensaje.document?.id;
+      const mediaIdMultimedia = mensaje.audio?.id || mensaje.voice?.id || mensaje.image?.id || mensaje.document?.id || mensaje.video?.id || mensaje.sticker?.id;
       if (mediaIdMultimedia && accessToken) {
         try {
           // 1. Obtener la URL de descarga
@@ -945,12 +945,15 @@ const recibirMensaje = async (req, res) => {
           if (!mediaResp.ok) {
             console.error('❌ Error al obtener media de Meta:', mediaResp.status, mediaJson);
           }
-          const mimeTypeDetectado = mediaJson.mime_type || (mensaje.type === 'voice' || mensaje.type === 'audio' ? 'audio/ogg' : (mensaje.type === 'image' ? 'image/jpeg' : (mensaje.type === 'document' ? 'application/octet-stream' : '')));
+          const mimeTypeDetectado = mediaJson.mime_type || (mensaje.type === 'voice' || mensaje.type === 'audio' ? 'audio/ogg' : (mensaje.type === 'image' ? 'image/jpeg' : (mensaje.type === 'sticker' ? 'image/webp' : (mensaje.type === 'video' ? 'video/mp4' : (mensaje.type === 'document' ? 'application/octet-stream' : '')))));
           const esArchivoAudio = mensaje.type === 'voice' || mensaje.type === 'audio' || mimeTypeDetectado.startsWith('audio/');
           const esDocumento = mensaje.type === 'document';
-          const esImagen = mensaje.type === 'image' || mimeTypeDetectado.startsWith('image/');
+          const esSticker = mensaje.type === 'sticker';
+          const esVideo = mensaje.type === 'video' || mimeTypeDetectado.startsWith('video/');
+          // Excluimos stickers del branch de imagen para guardarlos con su propio tipo
+          const esImagen = !esSticker && (mensaje.type === 'image' || mimeTypeDetectado.startsWith('image/'));
 
-          if (mediaJson.url && (esArchivoAudio || esDocumento || esImagen)) {
+          if (mediaJson.url && (esArchivoAudio || esDocumento || esImagen || esVideo || esSticker)) {
             // 2. Descargar el archivo binario con header; si falla reintenta con query param
             let fileResp = await fetch(mediaJson.url, {
               headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -1104,6 +1107,74 @@ const recibirMensaje = async (req, res) => {
                 }
               } catch (err) {
                 console.error('❌ Error al guardar imagen:', err);
+              }
+            } else if (esSticker && fileBuffer.length > 0) {
+              try {
+                const empresaFolder = String(empresa._id);
+                const uploadDirEmpresa = path.join(__dirname, '..', 'uploads', empresaFolder);
+                fs.mkdirSync(uploadDirEmpresa, { recursive: true });
+                const nombreArchivo = `${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
+                const archivoFinal = path.join(uploadDirEmpresa, nombreArchivo);
+                fs.writeFileSync(archivoFinal, fileBuffer);
+                const urlRelativa = `/uploads/${empresaFolder}/${nombreArchivo}`;
+                await Mensaje.findByIdAndUpdate(mensajeClienteDb._id, {
+                  $set: { tipo: 'sticker', urlArchivo: urlRelativa, contenido: '📎 [Sticker]' }
+                });
+                const ioSticker = req.app.get('io');
+                if (ioSticker) {
+                  ioSticker.to(empresa._id.toString()).emit('mensaje-nuevo', {
+                    conversacionId: conversacion._id,
+                    mensaje: {
+                      _id: mensajeClienteDb._id,
+                      remitente: 'cliente',
+                      contenido: '📎 [Sticker]',
+                      tipo: 'sticker',
+                      urlArchivo: urlRelativa,
+                      fecha: new Date()
+                    },
+                    conversacion: {
+                      _id: conversacion._id,
+                      ultimoMensaje: contenidoEntrada,
+                      updatedAt: new Date()
+                    }
+                  });
+                }
+              } catch (err) {
+                console.error('❌ Error al guardar sticker:', err);
+              }
+            } else if (esVideo && fileBuffer.length > 0) {
+              try {
+                const empresaFolder = String(empresa._id);
+                const uploadDirEmpresa = path.join(__dirname, '..', 'uploads', empresaFolder);
+                fs.mkdirSync(uploadDirEmpresa, { recursive: true });
+                const nombreArchivo = `${Date.now()}-${Math.round(Math.random() * 1E9)}.mp4`;
+                const archivoFinal = path.join(uploadDirEmpresa, nombreArchivo);
+                fs.writeFileSync(archivoFinal, fileBuffer);
+                const urlRelativa = `/uploads/${empresaFolder}/${nombreArchivo}`;
+                await Mensaje.findByIdAndUpdate(mensajeClienteDb._id, {
+                  $set: { tipo: 'video', urlArchivo: urlRelativa, contenido: '📎 [Video]' }
+                });
+                const ioVideo = req.app.get('io');
+                if (ioVideo) {
+                  ioVideo.to(empresa._id.toString()).emit('mensaje-nuevo', {
+                    conversacionId: conversacion._id,
+                    mensaje: {
+                      _id: mensajeClienteDb._id,
+                      remitente: 'cliente',
+                      contenido: '📎 [Video]',
+                      tipo: 'video',
+                      urlArchivo: urlRelativa,
+                      fecha: new Date()
+                    },
+                    conversacion: {
+                      _id: conversacion._id,
+                      ultimoMensaje: contenidoEntrada,
+                      updatedAt: new Date()
+                    }
+                  });
+                }
+              } catch (err) {
+                console.error('❌ Error al guardar video:', err);
               }
             }
 
