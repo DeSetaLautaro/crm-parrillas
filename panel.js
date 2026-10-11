@@ -2940,12 +2940,27 @@ function updateVisibilidad() {
   }
 }
 
-// ===== Vista móvil: mostrar bandeja al colapsar pantalla =====
+// ===== Vista móvil: ajustar al cambiar de modo (desktop <-> mobile) =====
+// OJO: NO cerramos el chat en cualquier resize, porque en el celular el teclado
+// virtual dispara resize y nos sacaría del chat al tocar el input.
+// Solo reaccionamos cuando cambia el "modo" (cruce del breakpoint de 768).
+let eraModoMovil = window.innerWidth <= 768;
+
 function ajustarVistaMovil() {
-  if (window.innerWidth <= 768 && chatActivoId) {
-    chatActivoId = null;
-    renderTodo();
+  const esModoMovilAhora = window.innerWidth <= 768;
+  const cambioDeModo = esModoMovilAhora !== eraModoMovil;
+  eraModoMovil = esModoMovilAhora;
+
+  // Solo actuamos si cruzamos el breakpoint y estamos entrando a mobile con un chat abierto.
+  if (!cambioDeModo || !esModoMovilAhora || !chatActivoId) return;
+
+  // Cerramos el chat y descartamos su capa de historial para no dejar entradas huérfanas
+  const tope = CAPAS_NAVEGACION[CAPAS_NAVEGACION.length - 1];
+  if (tope && tope.tipo === 'chat') {
+    CAPAS_NAVEGACION.pop();
   }
+  chatActivoId = null;
+  renderTodo();
 }
 
 // ===== Carga de conversaciones desde API =====
