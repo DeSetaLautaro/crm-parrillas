@@ -135,6 +135,11 @@ const PedidoSchema = new Schema(
     longitud: {
       type: Number,
       default: null
+    },
+    // Marca si el stock de este pedido ya fue devuelto (por cancelación)
+    stockDevuelto: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }

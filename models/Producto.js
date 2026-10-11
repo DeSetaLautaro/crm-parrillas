@@ -37,6 +37,12 @@ const ProductoSchema = new Schema(
       type: [String],
       default: []
     },
+    // Cantidad disponible. null = sin límite (no rompe productos existentes).
+    stock: {
+      type: Number,
+      default: null,
+      min: 0
+    },
     envio: {
       tipo: {
         type: String,

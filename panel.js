@@ -5266,7 +5266,7 @@ function actualizarEnvioCostoProducto() {
 
 function limpiarFormularioProducto() {
   const campos = [
-    'producto-id', 'producto-nombre', 'producto-precio', 'producto-extras',
+    'producto-id', 'producto-nombre', 'producto-precio', 'producto-stock', 'producto-extras',
     'producto-fbadid',
     'producto-envio-costo', 'producto-width', 'producto-depth', 'producto-height',
     'producto-diametro', 'producto-emparrillado-width', 'producto-emparrillado-depth'
@@ -5318,6 +5318,9 @@ function renderProductos(productos) {
     const badgeCantFotos = fotosProducto.length > 1
       ? `<span class="producto-extra">📸 ${fotosProducto.length} fotos</span>`
       : '';
+    const stockBadge = p.stock === 0
+      ? `<span class="producto-extra" style="color:#dc2626;font-weight:600;">AGOTADO</span>`
+      : (p.stock > 0 ? `<span class="producto-extra">Stock: ${p.stock}</span>` : '');
     const medidas = p.dimensions?.displayString
       ? `<span class="producto-extra">${escaparHTML(p.dimensions.displayString)}</span>`
       : '';
@@ -5333,6 +5336,7 @@ function renderProductos(productos) {
           ${medidas}
           ${extras}
           ${badgeCantFotos}
+          ${stockBadge}
           <span class="producto-extra">${etiquetaEnvioProducto(p.envio)}</span>
         </div>
         <div class="producto-acciones">
@@ -5375,6 +5379,7 @@ function editarProducto(id) {
   set('producto-id', p._id);
   set('producto-nombre', p.nombre || '');
   set('producto-precio', p.precio ?? '');
+  set('producto-stock', p.stock ?? '');
   PRODUCTO_FOTOS = Array.isArray(p.fotos) && p.fotos.length > 0
     ? [...p.fotos]
     : (p.fotoUrl ? [p.fotoUrl] : []);
@@ -5430,6 +5435,11 @@ async function guardarProducto() {
     return Number(v);
   };
 
+  const stockRaw = obtenerValorProducto('producto-stock');
+  const stock = stockRaw === '' || isNaN(Number(stockRaw))
+    ? null
+    : Math.max(0, Math.floor(Number(stockRaw)));
+
   const payload = {
     nombre,
     precio,
@@ -5437,6 +5447,7 @@ async function guardarProducto() {
     fotoUrl: PRODUCTO_FOTOS[0] || '',
     fbAdId,
     extras,
+    stock,
     envio: { tipo: tipoEnvio, costo: tipoEnvio === 'fijo' ? costoEnvio : 0 },
     dimensions: {
       widthCm: numeroOpcional('producto-width'),

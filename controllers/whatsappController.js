@@ -9,7 +9,7 @@ const Mensaje = require('../models/Mensaje');
 const Producto = require('../models/Producto');
 const Usuario = require('../models/usuario');
 const Pedido = require('../models/Pedido');
-const { guardarPedidoConfirmado } = require('./pedidosController');
+const { guardarPedidoConfirmado, reintegrarStock } = require('./pedidosController');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
@@ -79,6 +79,7 @@ CÓMO RESPONDER:
 4. El bot responde SIEMPRE y NUNCA deriva a un humano desde su propia respuesta. Si el cliente pide explícitamente hablar con una persona, el sistema lo detecta automáticamente y hace la derivación; vos seguí respondiendo normal. Si el cliente pide algo que no tenés (un dato, una foto, una medida que no figura en el catálogo), respondé con lo que tengas o decí "eso lo consulto con el local". Si el cliente pregunta en qué horario puede hablar con una persona, respondé con el horario del local que figura arriba en este prompt.
 5. Confirmá el pedido SOLO cuando el cliente ya dio la dirección y muestra intención clara de comprar.
 6. Si el cliente pide explícitamente ver la FOTO de un producto del catálogo, y ese producto figura con "Con foto", mandá la foto (ver formato abajo). No ofrezcas fotos de productos que figuran "Sin foto".
+7. Si un producto figura AGOTADO en el catálogo, no lo ofrezcas ni lo sumes al carrito. Si el cliente lo pide, avisale que ya no hay disponible.
 
 FORMATO DE RESPUESTA (MUY IMPORTANTE):
 Respondé SIEMPRE con un objeto JSON válido, sin markdown, sin bloques de código y sin texto extra. Usá uno de estos dos formatos exactos:
@@ -202,10 +203,32 @@ function combinarAtajos(usuario, empresa) {
   return combinados.filter(a => a.comando && a.respuesta);
 }
 
+// Chequeo NO destructivo del stock del carrito (para pre-validar antes de responder).
+async function verificarStockCarrito(items, empresaId) {
+  const faltantes = [];
+  for (const item of items || []) {
+    const cantidad = Math.max(1, parseInt(item.cantidad) || 1);
+    const nombre = String(item.nombre || '').trim();
+    if (!nombre || !empresaId) continue;
+
+    const prod = await Producto.findOne({ empresaId, nombre }).lean();
+    if (!prod || prod.stock === null || prod.stock === undefined) continue;
+    if (prod.stock < cantidad) {
+      faltantes.push({ nombre, cantidad, disponible: prod.stock });
+    }
+  }
+  return { ok: faltantes.length === 0, faltantes };
+}
+
 async function procesarCarrito(empresa, conversacion, texto, productos) {
   if (!process.env.GEMINI_API_KEY) return null;
   try {
-    const menu = productos.map(p => `- ${p.nombre} ($${p.precio})`).join('\n');
+    // No ofrecemos productos agotados al modelo
+    const disponibles = (productos || []).filter(p =>
+      p.stock === null || p.stock === undefined || p.stock > 0
+    );
+    if (disponibles.length === 0) return null;
+    const menu = disponibles.map(p => `- ${p.nombre} ($${p.precio})`).join('\n');
     let prompt = `Actúa como sistema de punto de venta. El cliente escribió: "${texto}".
       Interpretá el pedido y devolvé un JSON con la estructura:
       {
@@ -1204,6 +1227,12 @@ JSON:`;
         }).sort({ createdAt: -1 });
 
         if (pedidoActivo) {
+          if (!pedidoActivo.stockDevuelto) {
+            await reintegrarStock(pedidoActivo.items, empresa._id);
+            await Pedido.findByIdAndUpdate(pedidoActivo._id, {
+              $set: { stockDevuelto: true }
+            });
+          }
           await Pedido.findByIdAndUpdate(pedidoActivo._id, {
             $set: { estado: 'Cancelado' }
           });
@@ -1479,6 +1508,8 @@ JSON:`;
               if (p.envio?.tipo === 'gratis') partes.push('Envío gratis');
               else if (p.envio?.tipo === 'fijo') partes.push(`Envío $${Number(p.envio.costo || 0).toFixed(2)}`);
               else partes.push('Envío a consultar');
+              if (p.stock === 0) partes.push('AGOTADO - NO DISPONIBLE');
+              else if (p.stock > 0) partes.push(`Stock: ${p.stock}`);
               const tieneFotos = (Array.isArray(p.fotos) && p.fotos.length > 0) || p.fotoUrl;
               partes.push(tieneFotos ? 'Con foto' : 'Sin foto');
               return partes.join(' | ');
@@ -1534,6 +1565,22 @@ JSON:`;
       }
     }
 
+    // ===== Pre-chequeo de stock ANTES de enviar la respuesta =====
+    // Si el carrito tiene items y a alguno le falta stock, corregimos el mensaje
+    // y bloqueamos el guardado automático del pedido.
+    let stockInsuficiente = false;
+    if (botHabilitado && Array.isArray(conversacion.carrito) && conversacion.carrito.length > 0) {
+      const chequeo = await verificarStockCarrito(conversacion.carrito, empresa._id);
+      if (!chequeo.ok) {
+        stockInsuficiente = true;
+        const nombres = chequeo.faltantes.map(f => f.nombre).join(', ');
+        respuestaIA = `Uy, justo se agotó: ${nombres}. ¿Querés elegir otra cosa?`;
+        tipoRespuestaIA = 'texto';
+        productoFotoIA = null;
+        urlArchivoIA = '';
+      }
+    }
+
     // Parsear salida estructurada del modelo (texto o imagen)
     let tipoRespuestaIA = 'texto';
     let productoFotoIA = null;
@@ -1555,6 +1602,22 @@ JSON:`;
         } catch (_) {
           // No era JSON: se mantiene el texto tal cual
         }
+      }
+    }
+
+    // ===== Pre-chequeo de stock ANTES de enviar la respuesta =====
+    // Si el carrito tiene items y a alguno le falta stock, corregimos el mensaje
+    // y bloqueamos el guardado automático del pedido.
+    let stockInsuficiente = false;
+    if (botHabilitado && Array.isArray(conversacion.carrito) && conversacion.carrito.length > 0) {
+      const chequeo = await verificarStockCarrito(conversacion.carrito, empresa._id);
+      if (!chequeo.ok) {
+        stockInsuficiente = true;
+        const nombres = chequeo.faltantes.map(f => f.nombre).join(', ');
+        respuestaIA = `Uy, justo se agotó: ${nombres}. ¿Querés elegir otra cosa?`;
+        tipoRespuestaIA = 'texto';
+        productoFotoIA = null;
+        urlArchivoIA = '';
       }
     }
 
@@ -1692,7 +1755,7 @@ JSON:`;
           if (match) direccionEntrega = match[1].trim();
         }
         const tieneDireccionCompleta = direccionEntrega.trim() !== '';
-        if (carritoActual.length > 0 && tieneDireccionCompleta) {
+        if (!stockInsuficiente && carritoActual.length > 0 && tieneDireccionCompleta) {
           const totalCarrito = (conversacion.carritoTotal || 0) ||
             carritoActual.reduce((sum, it) => sum + (it.cantidad * it.precioUnitario), 0);
 
@@ -3354,24 +3417,33 @@ JSON:`;
       if (match) direccion = match[1].trim();
     }
 
-    const pedido = await guardarPedidoConfirmado({
-      localId: usuario?._id,
-      empresaId: empresa._id,
-      contactoId: contacto._id,
-      conversacionId: conversacion._id,
-      cliente: contacto.nombre || 'Cliente',
-      telefonoCliente: contacto.telefono,
-      items,
-      total,
-      metodoPago: 'Pendiente',
-      estado: 'confirmado',
-      direccionEntrega: direccion,
-      notas: '',
-      fechaTurno: '',
-      fecha: new Date(),
-      latitud: conversacion.latitud || null,
-      longitud: conversacion.longitud || null
-    });
+    let pedido;
+    try {
+      pedido = await guardarPedidoConfirmado({
+        localId: usuario?._id,
+        empresaId: empresa._id,
+        contactoId: contacto._id,
+        conversacionId: conversacion._id,
+        cliente: contacto.nombre || 'Cliente',
+        telefonoCliente: contacto.telefono,
+        items,
+        total,
+        metodoPago: 'Pendiente',
+        estado: 'confirmado',
+        direccionEntrega: direccion,
+        notas: '',
+        fechaTurno: '',
+        fecha: new Date(),
+        latitud: conversacion.latitud || null,
+        longitud: conversacion.longitud || null
+      });
+    } catch (e) {
+      if (e.code === 'SIN_STOCK') {
+        const nombres = (e.faltantes || []).map(f => f.nombre).join(', ');
+        return res.status(422).json({ error: `No hay stock suficiente: ${nombres}`, faltantes: e.faltantes });
+      }
+      throw e;
+    }
 
     await Conversacion.findByIdAndUpdate(conversacion._id, {
       $set: { carrito: [], carritoTotal: 0, latitud: null, longitud: null }

@@ -78,6 +78,14 @@ function limpiarExtras(extras) {
   return extras.map(e => String(e).trim()).filter(Boolean);
 }
 
+// Stock disponible: null = sin límite. Cualquier valor inválido o vacío cae a null.
+function normalizarStock(stock) {
+  if (stock === '' || stock === null || stock === undefined) return null;
+  const n = Number(stock);
+  if (Number.isNaN(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
 // Normaliza la lista de fotos de una parrilla (máximo 5).
 // Acepta el array nuevo `fotos` o, como fallback, el `fotoUrl` viejo (una sola).
 function normalizarFotos({ fotos, fotoUrl } = {}) {
@@ -134,7 +142,7 @@ async function crearProducto(req, res) {
       return res.status(403).json({ error: 'No se pudo identificar la empresa' });
     }
 
-    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId } = req.body || {};
+    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId, stock } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
@@ -151,7 +159,8 @@ async function crearProducto(req, res) {
       fbAdId: String(fbAdId || '').trim(),
       extras: limpiarExtras(extras),
       envio: normalizarEnvio(envio),
-      dimensions: normalizarDimensiones(dimensions)
+      dimensions: normalizarDimensiones(dimensions),
+      stock: normalizarStock(stock)
     });
 
     await producto.save();
@@ -177,7 +186,7 @@ async function actualizarProducto(req, res) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
-    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId } = req.body || {};
+    const { nombre, precio, fotoUrl, fotos, extras, envio, dimensions, fbAdId, stock } = req.body || {};
 
     const errorValidacion = validarProducto({ nombre, precio, dimensions, envio });
     if (errorValidacion) {
@@ -197,6 +206,7 @@ async function actualizarProducto(req, res) {
     producto.extras = limpiarExtras(extras);
     producto.envio = normalizarEnvio(envio);
     producto.dimensions = normalizarDimensiones(dimensions);
+    producto.stock = normalizarStock(stock);
 
     await producto.save();
     return res.json({ ok: true, producto });
